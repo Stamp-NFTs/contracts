@@ -9,7 +9,6 @@ const MoonStampERC721 = artifacts.require('MoonStampERC721.sol');
 
 const FUTURE = Math.floor(new Date('9999-01-01').getTime() / 1000);
 const TOMORROW = Math.floor(new Date().getTime() / 1000 + 3600 * 24);
-const YERSTEDAY = Math.floor(new Date().getTime() / 1000 - 3600 * 24);
 
 const PRICE_PER_TOKEN_ETH = web3.utils.toWei('1', 'ether');
 const NULL_ADDRESS = '0x'.padEnd(42, '0');
@@ -22,8 +21,9 @@ contract('MoonStampERC721', function (accounts) {
   });
 
   it('should prevent non owner to define a sale', async function () {
-    await assertRevert(contract.defineSale(
-      accounts[0], TOMORROW, FUTURE, PRICE_PER_TOKEN_ETH, 1000, { from : accounts[1] }),
+    await assertRevert(
+      contract.defineSale(
+        accounts[0], TOMORROW, FUTURE, PRICE_PER_TOKEN_ETH, 1000, { from: accounts[1] }),
       'OW01');
   });
 
@@ -42,10 +42,10 @@ contract('MoonStampERC721', function (accounts) {
 
   it('should prevent non operator to mint', async function () {
     await assertRevert(
-     contract.mint(accounts[0], 2, 0, 0, '0x', { from: accounts[1] }),
-     'MS05');
+      contract.mint(accounts[0], 2, 0, 0, '0x', { from: accounts[1] }),
+      'MS05');
   });
-  
+
   it('should let operator mint', async function () {
     const tx = await contract.mint(accounts[0], 2, 0, 0, '0x');
     assert.ok(tx.receipt.status, 'Status');

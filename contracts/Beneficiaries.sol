@@ -17,7 +17,7 @@ contract Beneficiaries is Ownable {
 
   event BeneficiariesDefined(address payable[] addresses);
 
-  address payable[] beneficiaries;
+  address payable[] private beneficiaries;
 
   /*
    * @dev defineBeneficiaries

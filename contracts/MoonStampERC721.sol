@@ -30,8 +30,8 @@ contract MoonStampERC721 is Pausable, Beneficiaries, TokenERC721 {
     uint256 pricePerToken,
     uint256 supply);
 
-  address private constant OPERATOR_DEFINITION = address(0);
-  address constant NOSIGNER_DEFINITION = address(~uint160(0));
+  address internal constant OPERATOR_DEFINITION = address(0);
+  address internal constant NOSIGNER_DEFINITION = address(~uint160(0));
 
   struct SaleDefinition {
     uint64 startAt;
@@ -45,8 +45,8 @@ contract MoonStampERC721 is Pausable, Beneficiaries, TokenERC721 {
   // Two special definitions exist:
   // OPERATOR_DEFINITION: operators may have a minting allowance
   // NOSIGNER_DEFINIITON: if no signer approval is provided
-  mapping(address => SaleDefinition) saleDefinitions;
-  mapping(bytes32 => bool) transactions;
+  mapping(address => SaleDefinition) public saleDefinitions;
+  mapping(bytes32 => bool) internal transactions;
 
   constructor() TokenERC721("MoonStamp", "MSP", "", "", address(0), new uint256[](0)) {
     saleDefinitions[OPERATOR_DEFINITION] = SaleDefinition(uint64(0), ~uint64(0), 10**18, 3000);
@@ -62,9 +62,11 @@ contract MoonStampERC721 is Pausable, Beneficiaries, TokenERC721 {
     uint256 _pricePerToken,
     uint256 _supply) external onlyOwner returns (bool)
   {
-    require(_startAt > block.timestamp && _startAt <= _endAt, "MS01");
+    // solhint-disable-next-line
+    uint256 time = block.timestamp;
+    require(_startAt > time && _startAt <= _endAt, "MS01");
     require (saleDefinitions[_signer].startAt == 0
-      || saleDefinitions[_signer].startAt > block.timestamp, "MS02");
+      || saleDefinitions[_signer].startAt > time, "MS02");
     saleDefinitions[_signer] =
       SaleDefinition(_startAt, _endAt, _pricePerToken, _supply);
 
@@ -83,6 +85,8 @@ contract MoonStampERC721 is Pausable, Beneficiaries, TokenERC721 {
     uint64 _signatureNonce,
     bytes memory _signature) external payable whenNotPaused returns (bool)
   {
+    // solhint-disable-next-line
+    uint256 time = block.timestamp;
 
     SaleDefinition storage saleDefinition; 
     if (!isOperator(msg.sender)) {
@@ -96,7 +100,7 @@ contract MoonStampERC721 is Pausable, Beneficiaries, TokenERC721 {
         address signer = _signature.recoverSigner(hash);
         saleDefinition = saleDefinitions[signer];
 
-        require(_signatureValidity >= block.timestamp, "MS03");
+        require(_signatureValidity >= time, "MS03");
         transactions[hash] = true;
       }
 
@@ -105,8 +109,8 @@ contract MoonStampERC721 is Pausable, Beneficiaries, TokenERC721 {
       saleDefinition = saleDefinitions[OPERATOR_DEFINITION];
     }
 
-    require(block.timestamp > saleDefinition.startAt
-      && block.timestamp <= saleDefinition.endAt, "MS05");
+    require(time > saleDefinition.startAt
+      && time <= saleDefinition.endAt, "MS05");
     require(_quantity <= saleDefinition.remainingSupply, "MS06");
 
     uint256[] memory tokenIds = new uint256[](_quantity);
