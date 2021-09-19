@@ -1,0 +1,14 @@
+node_modules
+artifacts
+cache
+.secret.json*
+.DS_Store
+coverage
+coverage.json
+
+node_modules
+.env
+
+#Hardhat files
+cache
+artifacts
