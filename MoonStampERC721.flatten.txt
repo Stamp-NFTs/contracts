@@ -1,0 +1,862 @@
+yarn run v1.22.10
+$ hardhat flatten contracts/MoonStampERC721.sol
+// Sources flattened with hardhat v2.1.1 https://hardhat.org
+
+// File @c-layer/common/contracts/interface/IERC721Metadata.sol@v1.3.1
+
+// SPDX-License-Identifier: MIT
+
+pragma solidity ^0.8.0;
+
+/**
+ * @title ERC-721 Non-Fungible Token Standard, optional metadata extension
+ * @dev See https://eips.ethereum.org/EIPS/eip-721
+ */
+interface IERC721Metadata {
+
+    function name() external view returns (string memory);
+    function symbol() external view returns (string memory);
+    function tokenURI(uint256 tokenId) external view returns (string memory);
+}
+
+
+// File @c-layer/common/contracts/interface/IERC721Enumerable.sol@v1.3.1
+
+// SPDX-License-Identifier: MIT
+
+pragma solidity ^0.8.0;
+
+/**
+ * @title ERC-721 Non-Fungible Token Standard, optional enumeration extension
+ * @dev See https://eips.ethereum.org/EIPS/eip-721
+ */
+interface IERC721Enumerable {
+    function totalSupply() external view returns (uint256);
+    function tokenOfOwnerByIndex(address owner, uint256 index) external view returns (uint256 tokenId);
+    function tokenByIndex(uint256 index) external view returns (uint256);
+}
+
+
+// File @c-layer/common/contracts/interface/IERC165.sol@v1.3.1
+
+pragma solidity ^0.8.0;
+
+
+/**
+ * SPDX-License-Identifier: MIT
+ *
+ * @dev Interface of the ERC165 standard, as defined in the
+ * https://eips.ethereum.org/EIPS/eip-165[EIP].
+ *
+ * Implementers can declare support of contract interfaces, which can then be
+ * queried by others ({ERC165Checker}).
+ *
+ * For an implementation, see {ERC165}.
+ */
+interface IERC165 {
+
+  /**
+   * @dev Returns true if this contract implements the interface defined by
+   * `interfaceId`. See the corresponding
+   * https://eips.ethereum.org/EIPS/eip-165#how-interfaces-are-identified[EIP section]
+   * to learn more about how these ids are created.
+   *
+   * This function call must use less than 30 000 gas.
+   */
+  function supportsInterface(bytes4 _interfaceId) external view returns (bool);
+}
+
+
+// File @c-layer/common/contracts/interface/IERC721.sol@v1.3.1
+
+// SPDX-License-Identifier: MIT
+
+pragma solidity ^0.8.0;
+
+/**
+ * @dev Required interface of an ERC721 compliant contract.
+ */
+interface IERC721 is IERC165 {
+
+  event Transfer(address indexed from, address indexed to, uint256 indexed tokenId);
+  event Approval(address indexed owner, address indexed approved, uint256 indexed tokenId);
+  event ApprovalForAll(address indexed owner, address indexed operator, bool approved);
+
+  function balanceOf(address _owner) external view returns (uint256 balance);
+  function ownerOf(uint256 _tokenId) external view returns (address owner);
+
+  function transferFrom(address _from, address _to, uint256 _tokenId) external;
+  function safeTransferFrom(address _from, address _to, uint256 _tokenId) external;
+  function safeTransferFrom(address _from, address _to, uint256 _tokenId, bytes calldata data) external;
+
+  function approve(address _approved, uint256 _tokenId) external;
+  function getApproved(uint256 _tokenId) external view returns (address operator);
+  function setApprovalForAll(address _operator, bool _approved) external;
+  function isApprovedForAll(address _owner, address _operator) external view returns (bool);
+}
+
+
+// File @c-layer/common/contracts/interface/ITokenERC721.sol@v1.3.1
+
+// SPDX-License-Identifier: MIT
+
+pragma solidity ^0.8.0;
+
+
+
+interface ITokenERC721 is IERC721, IERC721Metadata, IERC721Enumerable {
+
+  event TemplateURIUpdated(string baseURI_, string suffixURI_);
+
+}
+
+
+// File @c-layer/common/contracts/interface/IERC721TokenReceiver.sol@v1.3.1
+
+// SPDX-License-Identifier: MIT
+
+pragma solidity ^0.8.0;
+
+/*
+ * @dev Note: the ERC-165 identifier for this interface is 0x150b7a02.
+ */
+interface IERC721TokenReceiver {
+
+  /* @notice Handle the receipt of an NFT
+   * @dev The ERC721 smart contract calls this function on the recipient
+   *      after a `transfer`. This function MAY throw to revert and reject the
+   *      transfer. Return of other than the magic value MUST result in the
+   *      transaction being reverted.
+   *      Note: the contract address is always the message sender.
+   * @param _operator The address which called `safeTransferFrom` function
+   * @param _from The address which previously owned the token
+   * @param _tokenId The NFT identifier which is being transferred
+   * @param _data Additional data with no specified format
+   * @return `bytes4(keccak256("onERC721Received(address,address,uint256,bytes)"))`
+   *      unless throwinga
+   */
+  function onERC721Received(address _operator, address _from, uint256 _tokenId, bytes calldata _data) external returns(bytes4);
+}
+
+
+// File @c-layer/common/contracts/Account.sol@v1.3.1
+
+pragma solidity ^0.8.0;
+
+
+/**
+ * @title Account
+ * @dev Utility regarding account interaction
+ *
+ * @author Cyril Lapinte - <cyril.lapinte@openfiz.com>
+ * SPDX-License-Identifier: MIT
+ *
+ * Error Messages:
+ **/
+library Account {
+  /**
+   * @dev isContract
+   */ 
+  function isContract(address _account) internal view returns (bool) {
+    uint size;
+    // solhint-disable-next-line no-inline-assembly
+    assembly { size := extcodesize(_account) }
+    return size > 0;
+  }
+}
+
+
+// File @c-layer/common/contracts/convert/Bytes32Convert.sol@v1.3.1
+
+pragma solidity ^0.8.0;
+
+
+/**
+ * @title Bytes32Convert
+ * @dev Convert bytes32 to string
+ *
+ * @author Cyril Lapinte - <cyril.lapinte@openfiz.com>
+ * SPDX-License-Identifier: MIT
+ **/
+library Bytes32Convert {
+
+  /**
+  * @dev toString
+  */
+  function toString(bytes32 _input) internal pure returns (string memory result) {
+    bytes memory reversed = new bytes(32);
+    uint256 i = 0;
+    uint256 v = uint256(_input);
+    while (v != 0) {
+      reversed[i++] = bytes1(uint8(48 + (v % 16)));
+      v = v / 16;
+    }
+    bytes memory s = new bytes(i);
+    for (uint j = 0; j < i; j++) {
+      s[j] = reversed[i - j - 1];
+    }
+
+    result = string(s);
+  }
+}
+
+
+// File @c-layer/common/contracts/token/TokenERC721.sol@v1.3.1
+
+pragma solidity ^0.8.0;
+
+
+
+
+/**
+ * @title TokenERC721 contract
+ *
+ * @author Cyril Lapinte - <cyril.lapinte@openfiz.com>
+ * SPDX-License-Identifier: MIT
+ * 
+ * Error messages
+ *   TN01: Token does not exist
+ *   TN02: Recipient is invalid
+ *   TN03: The approver must either be the owner or the operator
+ *   TN04: The token sender is not the owner
+ *   TN05: The sender must either be the owner, the operator or the approvee
+ *   TN06: The receiver callback was unsuccessfull
+ *   TN07: The token must not exist
+ */
+contract TokenERC721 is ITokenERC721 {
+  using Account for address;
+  using Bytes32Convert for bytes32;
+
+  string internal name_;
+  string internal symbol_;
+  string internal baseURI_;
+  string internal suffixURI_;
+
+  uint256 internal totalSupply_;
+
+  struct Owner {
+    uint256 balance;
+    mapping (uint256 => uint256) ownedTokenIds;
+    mapping (uint256 => uint256) ownedTokenIndexes;
+    mapping (address => bool) operators;
+  }
+
+  mapping (uint256 => uint256) internal tokenIds;
+  mapping (uint256 => address) internal ownersAddresses;
+  mapping (address => Owner) internal owners;
+
+  mapping (uint256 => address) internal approvees;
+
+  constructor(
+    string memory _name,
+    string memory _symbol,
+    string memory _baseURI,
+    string memory _suffixURI,
+    address _initialOwner,
+    uint256[] memory _initialTokenIds
+  ) {
+    name_ = _name;
+    symbol_ = _symbol;
+    baseURI_ = _baseURI;
+    suffixURI_ = _suffixURI;
+    emit TemplateURIUpdated(_baseURI, _suffixURI);
+
+    mintInternal(_initialOwner, _initialTokenIds);
+  }
+
+  function supportsInterface(bytes4 _interfaceId) public pure override returns (bool) {
+    return _interfaceId == type(IERC165).interfaceId
+      || _interfaceId == type(IERC721).interfaceId
+      || _interfaceId == type(IERC721Enumerable).interfaceId
+      || _interfaceId == type(IERC721Metadata).interfaceId;
+  }
+
+  function name() external override view returns (string memory) {
+    return name_;
+  }
+
+  function symbol() external override view returns (string memory) {
+    return symbol_;
+  }
+
+  function totalSupply() external override view returns (uint256) {
+    return totalSupply_;
+  }
+
+  function tokenURI(uint256 _indexId) external override view returns (string memory) { 
+    return string(abi.encodePacked(baseURI_, bytes32(_indexId).toString(), suffixURI_));
+  }
+
+  function tokenByIndex(uint256 _index) external override view returns (uint256) {
+    uint256 tokenId = tokenIds[_index];
+    tokenExistsInternal(tokenId);
+    return tokenId;
+  }
+
+  function balanceOf(address _owner) external override view returns (uint256) {
+    require(_owner != address(0), "TN02");
+    return owners[_owner].balance;
+  }
+
+  function tokenOfOwnerByIndex(address _owner, uint256 _index)
+    external override view returns (uint256)
+  {
+    uint256 tokenId = tokenIds[_index];
+    tokenExistsInternal(tokenId);
+    require(_owner != address(0), "TN02");
+    return owners[_owner].ownedTokenIds[_index];
+  }
+
+  function ownerOf(uint256 _tokenId) external override view returns (address) {
+    address owner = ownersAddresses[_tokenId];
+    require(owner != address(0), "TN02");
+    return owner;
+  }
+
+  function getApproved(uint256 _tokenId)
+    external override view returns (address)
+  {
+    tokenExistsInternal(_tokenId);
+    return approvees[_tokenId];
+  }
+
+  function isApprovedForAll(address _owner, address _operator)
+    external override view returns (bool)
+  {
+    return owners[_owner].operators[_operator];
+  }
+
+  function transferFrom(address _from, address _to, uint256 _tokenId)
+    external override
+  {
+    transferFromInternal(_from, _to, _tokenId);
+  }
+
+  function approve(address _approved, uint256 _tokenId) external override
+  {
+    address owner = ownersAddresses[_tokenId];
+    require(owner == msg.sender || owners[owner].operators[msg.sender], "TN03");
+    approvees[_tokenId] = _approved;
+    emit Approval(owner, _approved, _tokenId);
+  }
+
+  function setApprovalForAll(address _operator, bool _approved)
+    external override
+  {
+    owners[msg.sender].operators[_operator] = _approved;
+    emit ApprovalForAll(msg.sender, _operator, _approved);
+  }
+
+  function safeTransferFrom(address _from, address _to, uint256 _tokenId)
+    external override
+  {
+    transferFromInternal(_from, _to, _tokenId);
+    receiverCallbackInternal(_from, _to, _tokenId, "");
+  }
+
+  function safeTransferFrom(address _from, address _to, uint256 _tokenId, bytes calldata _data)
+    external override
+  {
+    transferFromInternal(_from, _to, _tokenId);
+    receiverCallbackInternal(_from, _to, _tokenId, _data);
+  }
+
+  function tokenExistsInternal(uint256 _tokenId) internal view {
+    require(ownersAddresses[_tokenId] != address(0), "TN01");
+  }
+
+  function mintInternal(address _recipient, uint256[] memory _tokenIds) internal {
+    totalSupply_ += _tokenIds.length;
+
+    Owner storage owner_ = owners[_recipient];
+    owner_.balance += _tokenIds.length;
+
+    for(uint256 i=0; i < _tokenIds.length; i++) {
+      uint256 tokenId = _tokenIds[i];
+      require(ownersAddresses[tokenId] == address(0), "TN07");
+      tokenIds[i] = tokenId;
+      ownersAddresses[tokenId] = _recipient;
+      owner_.ownedTokenIds[i] = tokenId;
+      owner_.ownedTokenIndexes[tokenId] = i;
+      emit Transfer(address(0), _recipient, tokenId);
+    }
+  }
+
+  function transferFromInternal(address _from, address _to, uint256 _tokenId)
+    internal
+  {
+    tokenExistsInternal(_tokenId);
+    require(_to != address(0), "TN02");
+    require(ownersAddresses[_tokenId] == _from, "TN04");
+
+    require(_from == msg.sender ||
+      approvees[_tokenId] == msg.sender ||
+      owners[_from].operators[msg.sender], "TN05");
+
+    if (approvees[_tokenId] != address(0)) {
+      approvees[_tokenId] = address(0);
+      emit Approval(_from, address(0), _tokenId);
+    }
+
+    ownersAddresses[_tokenId] = _to;
+
+    Owner storage from = owners[_from];
+    from.ownedTokenIds[from.ownedTokenIndexes[_tokenId]] =
+      from.ownedTokenIds[from.balance-1];
+    from.ownedTokenIds[from.balance-1] = 0;
+    from.balance--;
+
+    Owner storage to = owners[_to];
+    to.ownedTokenIds[to.balance] = _tokenId;
+    to.ownedTokenIndexes[_tokenId] = to.balance;
+    to.balance++;
+
+    emit Transfer(_from, _to, _tokenId);
+  }
+
+  function receiverCallbackInternal(address _from, address _to, uint256 _tokenId, bytes memory _data)
+    internal
+  {
+    if(_to.isContract()) {
+      require(IERC721TokenReceiver(_to).onERC721Received(msg.sender, _from, _tokenId, _data)
+        == IERC721TokenReceiver.onERC721Received.selector, "TN06");
+    }
+  }
+}
+
+
+// File @c-layer/common/contracts/operable/Ownable.sol@v1.3.1
+
+pragma solidity ^0.8.0;
+
+
+/**
+ * @title Ownable
+ * @dev The Ownable contract has an owner address, and provides basic authorization control
+ * @dev functions, this simplifies the implementation of "user permissions".
+ *
+ * SPDX-License-Identifier: MIT
+ *
+ * Error messages
+ *   OW01: Message sender is not the owner
+ *   OW02: New owner must be valid
+*/
+contract Ownable {
+  address public owner;
+
+  event OwnershipRenounced(address indexed previousOwner);
+  event OwnershipTransferred(
+    address indexed previousOwner,
+    address indexed newOwner
+  );
+
+
+  /**
+   * @dev The Ownable constructor sets the original `owner` of the contract to the sender
+   * account.
+   */
+  constructor() {
+    owner = msg.sender;
+  }
+
+  /**
+   * @dev Throws if called by any account other than the owner.
+   */
+  modifier onlyOwner() {
+    require(msg.sender == owner, "OW01");
+    _;
+  }
+
+  /**
+   * @dev Allows the current owner to relinquish control of the contract.
+   */
+  function renounceOwnership() public onlyOwner {
+    emit OwnershipRenounced(owner);
+    owner = address(0);
+  }
+
+  /**
+   * @dev Allows the current owner to transfer control of the contract to a newOwner.
+   * @param _newOwner The address to transfer ownership to.
+   */
+  function transferOwnership(address _newOwner) public onlyOwner {
+    _transferOwnership(_newOwner);
+  }
+
+  /**
+   * @dev Transfers control of the contract to a newOwner.
+   * @param _newOwner The address to transfer ownership to.
+   */
+  function _transferOwnership(address _newOwner) internal {
+    require(_newOwner != address(0), "OW02");
+    emit OwnershipTransferred(owner, _newOwner);
+    owner = _newOwner;
+  }
+}
+
+
+// File @c-layer/common/contracts/operable/Operable.sol@v1.3.1
+
+pragma solidity ^0.8.0;
+
+/**
+ * @title Operable
+ * @dev The Operable contract enable the restrictions of operations to a set of operators
+ *
+ * @author Cyril Lapinte - <cyril.lapinte@openfiz.com>
+ * SPDX-License-Identifier: MIT
+ *
+ * Error messages
+ * OP01: Message sender must be an operator
+ * OP02: Address must be an operator
+ * OP03: Address must not be an operator
+ */
+contract Operable is Ownable {
+
+  mapping (address => bool) private operators_;
+
+  /**
+   * @dev Throws if called by any account other than the operator
+   */
+  modifier onlyOperator {
+    require(operators_[msg.sender], "OP01");
+    _;
+  }
+
+  /**
+   * @dev constructor
+   */
+  constructor() {
+    operators_[msg.sender] = true;
+  }
+
+  /**
+   * @dev isOperator
+   * @param _address operator address
+   */
+  function isOperator(address _address) public view returns (bool) {
+    return operators_[_address];
+  }
+
+  /**
+   * @dev removeOperator
+   * @param _address operator address
+   */
+  function removeOperator(address _address) public onlyOwner {
+    require(operators_[_address], "OP02");
+    operators_[_address] = false;
+    emit OperatorRemoved(_address);
+  }
+
+  /**
+   * @dev defineOperator
+   * @param _role operator role
+   * @param _address operator address
+   */
+  function defineOperator(string memory _role, address _address)
+    public onlyOwner
+  {
+    require(!operators_[_address], "OP03");
+    operators_[_address] = true;
+    emit OperatorDefined(_role, _address);
+  }
+
+  event OperatorRemoved(address address_);
+  event OperatorDefined(
+    string role,
+    address address_
+  );
+}
+
+
+// File @c-layer/common/contracts/lifecycle/Pausable.sol@v1.3.1
+
+pragma solidity ^0.8.0;
+
+/**
+ * @title Pausable
+ * @dev Base contract which allows children to implement an emergency stop mechanism.
+ *
+ * SPDX-License-Identifier: MIT
+ *
+ * Error messages
+ * PA01: the contract is paused
+ * PA02: the contract is unpaused
+ **/
+contract Pausable is Operable {
+  event Pause();
+  event Unpause();
+
+  bool public paused = false;
+
+
+  /**
+   * @dev Modifier to make a function callable only when the contract is not paused.
+   */
+  modifier whenNotPaused() {
+    require(!paused, "PA01");
+    _;
+  }
+
+  /**
+   * @dev Modifier to make a function callable only when the contract is paused.
+   */
+  modifier whenPaused() {
+    require(paused, "PA02");
+    _;
+  }
+
+  /**
+   * @dev called by the operator to pause, triggers stopped state
+   */
+  function pause() public onlyOperator whenNotPaused {
+    paused = true;
+    emit Pause();
+  }
+
+  /**
+   * @dev called by the operator to unpause, returns to normal state
+   */
+  function unpause() public onlyOperator whenPaused {
+    paused = false;
+    emit Unpause();
+  }
+}
+
+
+// File @c-layer/common/contracts/signer/SignerRecovery.sol@v1.3.1
+
+pragma solidity ^0.8.0;
+
+
+/**
+ * @title SignerRecovery
+ * @dev Recover the address associated with a signed message
+ *
+ * @author Cyril Lapinte - <cyril.lapinte@openfiz.com>
+ * SPDX-License-Identifier: MIT
+ *
+ * Error Messages:
+ **/
+library SignerRecovery {
+
+  // web3.eth.sign prepend the string below to sign messages
+  string constant private ETHEREUM_SIGN_MESSAGE_PREFIX = "\x19Ethereum Signed Message:\n32";
+
+  /**
+   * @dev recoverSigner
+   */ 
+  function recoverSigner(bytes memory _signature, bytes32 _hash)
+    internal pure returns (address)
+  {
+    bytes32 signatureHash = keccak256(
+      abi.encodePacked(ETHEREUM_SIGN_MESSAGE_PREFIX, _hash)
+    );
+
+    bytes32 r;
+    bytes32 s;
+    uint8 v;
+
+    // Extract r, s and v
+    // solhint-disable-next-line no-inline-assembly
+    assembly {
+      r := mload(add(_signature, 0x20))
+      s := mload(add(_signature, 0x40))
+      v := byte(0, mload(add(_signature, 0x60)))
+    }
+
+    // Version of signature should be 27 or 28, but 0 and 1 are also possible versions
+    v = (v < 27) ? v += 27 : v;
+
+    // If the version is correct return the signer address
+    if (v != 27 && v != 28) {
+      return address(0);
+    } else {
+      return ecrecover(
+        signatureHash,
+        v,
+        r,
+        s
+      );
+    }
+  }
+}
+
+
+// File contracts/Beneficiaries.sol
+
+pragma solidity ^0.8.0;
+
+/**
+ * @title Beneficiaries
+ * @dev Beneficiaries
+ * @author Cyril Lapinte - <cyril@openfiz.com>
+ * SPDX-License-Identifier: MIT
+ *
+ * Error messages
+ *   BE01: Beneficiary must be defined
+ *   BE02: No ETH to transfer
+ */
+contract Beneficiaries is Operable {
+
+  event BeneficiariesDefined(address payable[] addresses);
+
+  address payable[] private beneficiaries;
+
+  /*
+   * @dev defineBeneficiaries
+   */
+  function defineBeneficiaries(address payable[] memory _addresses)
+    public onlyOwner returns (bool)
+  {
+    beneficiaries = _addresses;
+    emit BeneficiariesDefined(_addresses);
+    return true;
+  }
+
+  /**
+   * @dev withdrawETH
+   * @dev Disclaimer: no guarantees are provided with this method
+   * @dev This method may fail during any ETH transfer if ever:
+   * @dev it runs out of gas
+   * @dev or if the stack becomes too deep
+   * @dev It is the responsability of the user to ensure it works properly
+   */
+  function withdrawETH() public onlyOperator returns (bool)
+  {
+    require(beneficiaries.length > 0, "BE01");
+    uint256 value = address(this).balance / beneficiaries.length;
+    require(value > 0, "BE02");
+    for(uint256 i=0; i < beneficiaries.length; i++) {
+      // solhint-disable-next-line avoid-call-value, avoid-low-level-calls
+      beneficiaries[i].transfer(value);
+    }
+    return true;
+  }
+}
+
+
+// File contracts/MoonStampERC721.sol
+
+pragma solidity ^0.8.0;
+
+
+
+
+/**
+ * @title MoonStampERC721 contract
+ *
+ * @author Cyril Lapinte - <cyril.lapinte@openfiz.com>
+ * SPDX-License-Identifier: MIT
+ * 
+ * Error messages
+ *  MS01: The sale must be defined in the future
+ *  MS02: The sale must not be started
+ *  MS03: The signature is not valid anymore
+ *  MS04: Enough ethers must be provided
+ *  MS05: The sale is close
+ *  MS06: No more tokens are available 
+ */
+contract MoonStampERC721 is Pausable, Beneficiaries, TokenERC721 {
+  using SignerRecovery for bytes;
+
+  event SaleDefined(
+    address signer,
+    uint64 startAt,
+    uint64 endAt,
+    uint256 pricePerToken,
+    uint256 supply);
+
+  address internal constant OPERATOR_DEFINITION = address(0);
+  address internal constant NOSIGNER_DEFINITION = address(~uint160(0));
+
+  struct SaleDefinition {
+    uint64 startAt;
+    uint64 endAt;
+
+    uint256 pricePerToken;
+    uint256 remainingSupply;
+  }
+
+  // A definition may exist for different signers
+  // Two special definitions exist:
+  // OPERATOR_DEFINITION: operators may have a minting allowance
+  // NOSIGNER_DEFINIITON: if no signer approval is provided
+  mapping(address => SaleDefinition) public saleDefinitions;
+  mapping(bytes32 => bool) internal transactions;
+
+  constructor() TokenERC721("MoonStamp", "MSP", "", "", address(0), new uint256[](0)) {
+    saleDefinitions[OPERATOR_DEFINITION] = SaleDefinition(uint64(0), ~uint64(0), 10**18, 3000);
+  }
+
+  /**
+   * @dev defineSale
+   */
+  function defineSale(
+    address _signer,
+    uint64 _startAt,
+    uint64 _endAt,
+    uint256 _pricePerToken,
+    uint256 _supply) external onlyOwner returns (bool)
+  {
+    // solhint-disable-next-line
+    uint256 time = block.timestamp;
+    require(_startAt > time && _startAt <= _endAt, "MS01");
+    require (saleDefinitions[_signer].startAt == 0
+      || saleDefinitions[_signer].startAt > time, "MS02");
+    saleDefinitions[_signer] =
+      SaleDefinition(_startAt, _endAt, _pricePerToken, _supply);
+
+    emit SaleDefined(
+      _signer, _startAt, _endAt, _pricePerToken, _supply);
+    return true;
+  }
+
+  /**
+   * @dev mint
+   */
+  function mint(
+    address _recipient,
+    uint8 _quantity,
+    uint64 _signatureValidity,
+    uint64 _signatureNonce,
+    bytes memory _signature) external payable whenNotPaused returns (bool)
+  {
+    // solhint-disable-next-line
+    uint256 time = block.timestamp;
+
+    SaleDefinition storage saleDefinition; 
+    if (!isOperator(msg.sender)) {
+      if (_signature.length == 0) {
+        saleDefinition = saleDefinitions[NOSIGNER_DEFINITION];
+      } else {
+        bytes32 hash = keccak256(abi.encode(
+          address(this), msg.sender, _quantity, _signatureValidity, _signatureNonce)
+        );
+
+        address signer = _signature.recoverSigner(hash);
+        saleDefinition = saleDefinitions[signer];
+
+        require(_signatureValidity >= time, "MS03");
+        transactions[hash] = true;
+      }
+
+      require(msg.value >= _quantity * saleDefinition.pricePerToken, "MS04");
+    } else {
+      saleDefinition = saleDefinitions[OPERATOR_DEFINITION];
+    }
+
+    require(time > saleDefinition.startAt
+      && time <= saleDefinition.endAt, "MS05");
+    require(_quantity <= saleDefinition.remainingSupply, "MS06");
+
+    uint256[] memory tokenIds = new uint256[](_quantity);
+    for(uint256 i=0; i < _quantity; i++) {
+      tokenIds[i] = i + totalSupply_;
+    }
+
+    mintInternal(_recipient, tokenIds);
+    return true;
+  }
+}
+Done in 2.04s.
