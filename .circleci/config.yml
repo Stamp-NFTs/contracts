@@ -29,6 +29,8 @@ jobs:
             - ~/.cache/yarn
       - persist_to_workspace:
           root: ~/project
+          paths:
+            - node_modules
   lint:
     <<: *defaults
     steps:
@@ -59,6 +61,11 @@ jobs:
       - run:
           name: Unit tests with coverage report
           command: yarn run coverage
+      - persist_to_workspace:
+          root: ~/project
+          paths:
+            - coverage
+            - coverage.json
   publish_coverage:
     <<: *defaults
     steps:
