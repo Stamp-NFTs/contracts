@@ -1,6 +1,6 @@
 pragma solidity ^0.8.0;
 
-import "@c-layer/common/contracts/operable/Ownable.sol";
+import "@c-layer/common/contracts/operable/Operable.sol";
 
 
 /**
@@ -10,10 +10,10 @@ import "@c-layer/common/contracts/operable/Ownable.sol";
  * SPDX-License-Identifier: MIT
  *
  * Error messages
- *   BE01: Benefiaries and weights must be the same length
- *   BE02: Beneficiary must be defined
+ *   BE01: Beneficiary must be defined
+ *   BE02: No ETH to transfer
  */
-contract Beneficiaries is Ownable {
+contract Beneficiaries is Operable {
 
   event BeneficiariesDefined(address payable[] addresses);
 
@@ -38,9 +38,11 @@ contract Beneficiaries is Ownable {
    * @dev or if the stack becomes too deep
    * @dev It is the responsability of the user to ensure it works properly
    */
-  function withdrawETH() public onlyOwner returns (bool)
+  function withdrawETH() public onlyOperator returns (bool)
   {
+    require(beneficiaries.length > 0, "BE01");
     uint256 value = address(this).balance / beneficiaries.length;
+    require(value > 0, "BE02");
     for(uint256 i=0; i < beneficiaries.length; i++) {
       // solhint-disable-next-line avoid-call-value, avoid-low-level-calls
       beneficiaries[i].transfer(value);
