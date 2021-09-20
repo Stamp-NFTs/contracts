@@ -27,6 +27,8 @@ jobs:
           key: yarn-packages-{{ checksum "yarn.lock" }}
           paths:
             - ~/.cache/yarn
+      - persist_to_workspace:
+          root: ~/project
   lint:
     <<: *defaults
     steps:
