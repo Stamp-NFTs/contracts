@@ -7,7 +7,6 @@
 const assertRevert = require('./helpers/assertRevert');
 const Beneficiaries = artifacts.require('BeneficiariesMock.sol');
 
-const NULL_ADDRESS = '0x'.padEnd(42, '0');
 const WEI = 3333;
 
 contract('Beneficiaries', function (accounts) {

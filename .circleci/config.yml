@@ -71,6 +71,8 @@ jobs:
     steps:
       - checkout:
           path: ~/project
+      - attach_workspace:
+          at: ~/project
       - run:
           name: Upload coverage
           command: |
