@@ -30,6 +30,8 @@ jobs:
   lint:
     <<: *defaults
     steps:
+      - checkout:
+          path: ~/project
       - attach_workspace:
           at: ~/project
       - run:
@@ -38,6 +40,8 @@ jobs:
   test:
     <<: *defaults
     steps:
+      - checkout:
+          path: ~/project
       - attach_workspace:
           at: ~/project
       - run:
@@ -46,6 +50,8 @@ jobs:
   coverage:
     <<: *defaults
     steps:
+      - checkout:
+          path: ~/project
       - attach_workspace:
           at: ~/project
       - run:
@@ -54,6 +60,8 @@ jobs:
   publish_coverage:
     <<: *defaults
     steps:
+      - checkout:
+          path: ~/project
       - run:
           name: Upload coverage
           command: |
