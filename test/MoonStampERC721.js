@@ -11,7 +11,7 @@ const MoonStampERC721Mock = artifacts.require('MoonStampERC721Mock.sol');
 const FUTURE = Math.floor(new Date('9999-01-01').getTime() / 1000);
 const TOMORROW = Math.floor(new Date().getTime() / 1000 + 3600 * 24);
 
-const OPERATOR_SALE = '0x'.padEnd(42, '0');
+// const OPERATOR_SALE = '0x'.padEnd(42, '0');
 const PUBLIC_SALE = '0x'.padEnd(42, 'f');
 
 const PRICE_PER_TOKEN_ETH = web3.utils.toWei('1', 'ether');
@@ -105,7 +105,7 @@ contract('MoonStampERC721', function (accounts) {
       const encodedParams = web3.eth.abi.encodeParameters(approveTypes, values);
       const hash = web3.utils.sha3(encodedParams, { encoding: 'hex' });
       return await web3.eth.sign(hash, approver);
-    }
+    };
 
     beforeEach(async function () {
       await contract.defineSale(
@@ -131,7 +131,7 @@ contract('MoonStampERC721', function (accounts) {
 
     describe('and after the buyer minted its first token', function () {
       let approval;
-      
+
       beforeEach(async function () {
         approval = await approve([ contract.address, accounts[1], 2, TOMORROW, 1 ], accounts[0]);
         await contract.mint(accounts[1], 2, TOMORROW, 1, approval,

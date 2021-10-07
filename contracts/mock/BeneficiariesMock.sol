@@ -17,6 +17,6 @@ contract BeneficiariesMock is Beneficiaries {
    */
   //solhint-disable-next-line no-complex-fallback
   receive() external payable {
-    updateWithdrawable();
+    //updateWithdrawable();
   }
 }
