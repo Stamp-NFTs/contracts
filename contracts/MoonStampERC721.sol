@@ -48,8 +48,14 @@ contract MoonStampERC721 is Pausable, Beneficiaries, TokenERC721 {
   mapping(address => SaleDefinition) public saleDefinitions;
   mapping(bytes32 => bool) internal transactions;
 
-  constructor() TokenERC721("MoonStamp", "MSP", "", "", address(0), new uint256[](0)) {
-    saleDefinitions[OPERATOR_DEFINITION] = SaleDefinition(uint64(0), ~uint64(0), 10**18, 3000);
+  constructor(
+    string memory _name,
+    string memory _symbol,
+    string memory _baseURI,
+    string memory _suffixURI,
+    uint256 _supply
+  ) TokenERC721(_name, _symbol, _baseURI, _suffixURI, address(0), new uint256[](0)) {
+    saleDefinitions[OPERATOR_DEFINITION] = SaleDefinition(uint64(0), ~uint64(0), 0, _supply);
   }
 
   /**
@@ -100,7 +106,7 @@ contract MoonStampERC721 is Pausable, Beneficiaries, TokenERC721 {
         address signer = _signature.recoverSigner(hash);
         saleDefinition = saleDefinitions[signer];
 
-        require(_signatureValidity >= time, "MS03");
+        require(_signatureValidity >= time && !transactions[hash], "MS03");
         transactions[hash] = true;
       }
 
@@ -119,6 +125,7 @@ contract MoonStampERC721 is Pausable, Beneficiaries, TokenERC721 {
     }
 
     mintInternal(_recipient, tokenIds);
+    saleDefinition.remainingSupply -= _quantity;
     return true;
   }
 }

@@ -1,6 +1,260 @@
 yarn run v1.22.10
-$ hardhat flatten contracts/MoonStampERC721.sol
+$ hardhat flatten
 // Sources flattened with hardhat v2.1.1 https://hardhat.org
+
+// File @c-layer/common/contracts/operable/Ownable.sol@v1.3.1
+
+pragma solidity ^0.8.0;
+
+
+/**
+ * @title Ownable
+ * @dev The Ownable contract has an owner address, and provides basic authorization control
+ * @dev functions, this simplifies the implementation of "user permissions".
+ *
+ * SPDX-License-Identifier: MIT
+ *
+ * Error messages
+ *   OW01: Message sender is not the owner
+ *   OW02: New owner must be valid
+*/
+contract Ownable {
+  address public owner;
+
+  event OwnershipRenounced(address indexed previousOwner);
+  event OwnershipTransferred(
+    address indexed previousOwner,
+    address indexed newOwner
+  );
+
+
+  /**
+   * @dev The Ownable constructor sets the original `owner` of the contract to the sender
+   * account.
+   */
+  constructor() {
+    owner = msg.sender;
+  }
+
+  /**
+   * @dev Throws if called by any account other than the owner.
+   */
+  modifier onlyOwner() {
+    require(msg.sender == owner, "OW01");
+    _;
+  }
+
+  /**
+   * @dev Allows the current owner to relinquish control of the contract.
+   */
+  function renounceOwnership() public onlyOwner {
+    emit OwnershipRenounced(owner);
+    owner = address(0);
+  }
+
+  /**
+   * @dev Allows the current owner to transfer control of the contract to a newOwner.
+   * @param _newOwner The address to transfer ownership to.
+   */
+  function transferOwnership(address _newOwner) public onlyOwner {
+    _transferOwnership(_newOwner);
+  }
+
+  /**
+   * @dev Transfers control of the contract to a newOwner.
+   * @param _newOwner The address to transfer ownership to.
+   */
+  function _transferOwnership(address _newOwner) internal {
+    require(_newOwner != address(0), "OW02");
+    emit OwnershipTransferred(owner, _newOwner);
+    owner = _newOwner;
+  }
+}
+
+
+// File @c-layer/common/contracts/operable/Operable.sol@v1.3.1
+
+pragma solidity ^0.8.0;
+
+/**
+ * @title Operable
+ * @dev The Operable contract enable the restrictions of operations to a set of operators
+ *
+ * @author Cyril Lapinte - <cyril.lapinte@openfiz.com>
+ * SPDX-License-Identifier: MIT
+ *
+ * Error messages
+ * OP01: Message sender must be an operator
+ * OP02: Address must be an operator
+ * OP03: Address must not be an operator
+ */
+contract Operable is Ownable {
+
+  mapping (address => bool) private operators_;
+
+  /**
+   * @dev Throws if called by any account other than the operator
+   */
+  modifier onlyOperator {
+    require(operators_[msg.sender], "OP01");
+    _;
+  }
+
+  /**
+   * @dev constructor
+   */
+  constructor() {
+    operators_[msg.sender] = true;
+  }
+
+  /**
+   * @dev isOperator
+   * @param _address operator address
+   */
+  function isOperator(address _address) public view returns (bool) {
+    return operators_[_address];
+  }
+
+  /**
+   * @dev removeOperator
+   * @param _address operator address
+   */
+  function removeOperator(address _address) public onlyOwner {
+    require(operators_[_address], "OP02");
+    operators_[_address] = false;
+    emit OperatorRemoved(_address);
+  }
+
+  /**
+   * @dev defineOperator
+   * @param _role operator role
+   * @param _address operator address
+   */
+  function defineOperator(string memory _role, address _address)
+    public onlyOwner
+  {
+    require(!operators_[_address], "OP03");
+    operators_[_address] = true;
+    emit OperatorDefined(_role, _address);
+  }
+
+  event OperatorRemoved(address address_);
+  event OperatorDefined(
+    string role,
+    address address_
+  );
+}
+
+
+// File contracts/Beneficiaries.sol
+
+pragma solidity ^0.8.0;
+
+/**
+ * @title Beneficiaries
+ * @dev Beneficiaries
+ * @author Cyril Lapinte - <cyril@openfiz.com>
+ * SPDX-License-Identifier: MIT
+ *
+ * Error messages
+ *   BE01: Beneficiary must be defined
+ *   BE02: No ETH to transfer
+ */
+contract Beneficiaries is Operable {
+
+  event BeneficiariesDefined(address payable[] addresses, uint32[] _weights);
+
+  struct Beneficiary {
+    address payable address_;
+    uint32 weight;
+    uint256 cumulatedTransferred;
+  }
+
+  uint256 private totalWeight;
+  uint256 private cumulatedWithdrawable;
+
+  Beneficiary[] beneficiaries;
+
+  /*
+   * @dev updateWithdrawable
+   */
+  function updateWithdrawable() internal {
+    cumulatedWithdrawable += msg.value;
+  }
+
+  /*
+   * @dev defineBeneficiaries
+   */
+  function defineBeneficiaries(
+    address payable[] memory _addresses, uint32[] memory _weights)
+    public onlyOwner returns (bool)
+  {
+    require(_addresses.length == _weights.length, "BE01");
+    for(uint256 i=0; i < beneficiaries.length; i++) {
+      require(beneficiaries[i].cumulatedTransferred == cumulatedWithdrawable, "BE02");
+    }
+    delete beneficiaries;
+
+    totalWeight = 0;
+    cumulatedWithdrawable = 0;
+    for(uint256 i=0; i < _addresses.length; i++) {
+      totalWeight += _weights[i];
+      beneficiaries.push(Beneficiary(_addresses[i], _weights[i], 0));
+    }
+
+    emit BeneficiariesDefined(_addresses, _weights);
+    return true;
+  }
+
+  /**
+   * @dev withdrawETHAll
+   */
+  function withdrawETHAll() external returns (bool success)
+  {
+    for(uint256 i = 0; i < beneficiaries.length; i++) {
+      success = success && this.withdrawETH(uint8(i));
+    }
+  }
+
+  /**
+   * @dev withdrawETH
+   */
+  function withdrawETH(uint8 _beneficiaryId) external returns (bool)
+  {
+    require(_beneficiaryId < beneficiaries.length, "BE03");
+    Beneficiary storage beneficiary = beneficiaries[_beneficiaryId];
+
+    uint256 value = (cumulatedWithdrawable - beneficiary.cumulatedTransferred);
+    beneficiary.cumulatedTransferred += value;
+    // solhint-disable-next-line avoid-call-value, avoid-low-level-calls
+    beneficiary.address_.transfer(value * beneficiary.weight / totalWeight);
+    return true;
+  }
+}
+
+
+// File contracts/mock/BeneficiariesMock.sol
+
+pragma solidity ^0.8.0;
+
+/**
+ * @title BeneficiariesMock
+ * @dev BeneficiariesMock
+ * @author Cyril Lapinte - <cyril@openfiz.com>
+ * SPDX-License-Identifier: MIT
+ *
+ * Error messages
+ */
+contract BeneficiariesMock is Beneficiaries {
+  /**
+   * @dev receive function
+   */
+  //solhint-disable-next-line no-complex-fallback
+  receive() external payable {
+    updateWithdrawable();
+  }
+}
+
 
 // File @c-layer/common/contracts/interface/IERC721Metadata.sol@v1.3.1
 
@@ -425,150 +679,6 @@ contract TokenERC721 is ITokenERC721 {
 }
 
 
-// File @c-layer/common/contracts/operable/Ownable.sol@v1.3.1
-
-pragma solidity ^0.8.0;
-
-
-/**
- * @title Ownable
- * @dev The Ownable contract has an owner address, and provides basic authorization control
- * @dev functions, this simplifies the implementation of "user permissions".
- *
- * SPDX-License-Identifier: MIT
- *
- * Error messages
- *   OW01: Message sender is not the owner
- *   OW02: New owner must be valid
-*/
-contract Ownable {
-  address public owner;
-
-  event OwnershipRenounced(address indexed previousOwner);
-  event OwnershipTransferred(
-    address indexed previousOwner,
-    address indexed newOwner
-  );
-
-
-  /**
-   * @dev The Ownable constructor sets the original `owner` of the contract to the sender
-   * account.
-   */
-  constructor() {
-    owner = msg.sender;
-  }
-
-  /**
-   * @dev Throws if called by any account other than the owner.
-   */
-  modifier onlyOwner() {
-    require(msg.sender == owner, "OW01");
-    _;
-  }
-
-  /**
-   * @dev Allows the current owner to relinquish control of the contract.
-   */
-  function renounceOwnership() public onlyOwner {
-    emit OwnershipRenounced(owner);
-    owner = address(0);
-  }
-
-  /**
-   * @dev Allows the current owner to transfer control of the contract to a newOwner.
-   * @param _newOwner The address to transfer ownership to.
-   */
-  function transferOwnership(address _newOwner) public onlyOwner {
-    _transferOwnership(_newOwner);
-  }
-
-  /**
-   * @dev Transfers control of the contract to a newOwner.
-   * @param _newOwner The address to transfer ownership to.
-   */
-  function _transferOwnership(address _newOwner) internal {
-    require(_newOwner != address(0), "OW02");
-    emit OwnershipTransferred(owner, _newOwner);
-    owner = _newOwner;
-  }
-}
-
-
-// File @c-layer/common/contracts/operable/Operable.sol@v1.3.1
-
-pragma solidity ^0.8.0;
-
-/**
- * @title Operable
- * @dev The Operable contract enable the restrictions of operations to a set of operators
- *
- * @author Cyril Lapinte - <cyril.lapinte@openfiz.com>
- * SPDX-License-Identifier: MIT
- *
- * Error messages
- * OP01: Message sender must be an operator
- * OP02: Address must be an operator
- * OP03: Address must not be an operator
- */
-contract Operable is Ownable {
-
-  mapping (address => bool) private operators_;
-
-  /**
-   * @dev Throws if called by any account other than the operator
-   */
-  modifier onlyOperator {
-    require(operators_[msg.sender], "OP01");
-    _;
-  }
-
-  /**
-   * @dev constructor
-   */
-  constructor() {
-    operators_[msg.sender] = true;
-  }
-
-  /**
-   * @dev isOperator
-   * @param _address operator address
-   */
-  function isOperator(address _address) public view returns (bool) {
-    return operators_[_address];
-  }
-
-  /**
-   * @dev removeOperator
-   * @param _address operator address
-   */
-  function removeOperator(address _address) public onlyOwner {
-    require(operators_[_address], "OP02");
-    operators_[_address] = false;
-    emit OperatorRemoved(_address);
-  }
-
-  /**
-   * @dev defineOperator
-   * @param _role operator role
-   * @param _address operator address
-   */
-  function defineOperator(string memory _role, address _address)
-    public onlyOwner
-  {
-    require(!operators_[_address], "OP03");
-    operators_[_address] = true;
-    emit OperatorDefined(_role, _address);
-  }
-
-  event OperatorRemoved(address address_);
-  event OperatorDefined(
-    string role,
-    address address_
-  );
-}
-
-
 // File @c-layer/common/contracts/lifecycle/Pausable.sol@v1.3.1
 
 pragma solidity ^0.8.0;
@@ -683,59 +793,6 @@ library SignerRecovery {
 }
 
 
-// File contracts/Beneficiaries.sol
-
-pragma solidity ^0.8.0;
-
-/**
- * @title Beneficiaries
- * @dev Beneficiaries
- * @author Cyril Lapinte - <cyril@openfiz.com>
- * SPDX-License-Identifier: MIT
- *
- * Error messages
- *   BE01: Beneficiary must be defined
- *   BE02: No ETH to transfer
- */
-contract Beneficiaries is Operable {
-
-  event BeneficiariesDefined(address payable[] addresses);
-
-  address payable[] private beneficiaries;
-
-  /*
-   * @dev defineBeneficiaries
-   */
-  function defineBeneficiaries(address payable[] memory _addresses)
-    public onlyOwner returns (bool)
-  {
-    beneficiaries = _addresses;
-    emit BeneficiariesDefined(_addresses);
-    return true;
-  }
-
-  /**
-   * @dev withdrawETH
-   * @dev Disclaimer: no guarantees are provided with this method
-   * @dev This method may fail during any ETH transfer if ever:
-   * @dev it runs out of gas
-   * @dev or if the stack becomes too deep
-   * @dev It is the responsability of the user to ensure it works properly
-   */
-  function withdrawETH() public onlyOperator returns (bool)
-  {
-    require(beneficiaries.length > 0, "BE01");
-    uint256 value = address(this).balance / beneficiaries.length;
-    require(value > 0, "BE02");
-    for(uint256 i=0; i < beneficiaries.length; i++) {
-      // solhint-disable-next-line avoid-call-value, avoid-low-level-calls
-      beneficiaries[i].transfer(value);
-    }
-    return true;
-  }
-}
-
-
 // File contracts/MoonStampERC721.sol
 
 pragma solidity ^0.8.0;
@@ -785,8 +842,13 @@ contract MoonStampERC721 is Pausable, Beneficiaries, TokenERC721 {
   mapping(address => SaleDefinition) public saleDefinitions;
   mapping(bytes32 => bool) internal transactions;
 
-  constructor() TokenERC721("MoonStamp", "MSP", "", "", address(0), new uint256[](0)) {
-    saleDefinitions[OPERATOR_DEFINITION] = SaleDefinition(uint64(0), ~uint64(0), 10**18, 3000);
+  constructor(
+    string memory _name,
+    string memory _symbol,
+    string memory _baseURI,
+    uint256 _supply
+  ) TokenERC721(_name, _symbol, _baseURI, '', address(0), new uint256[](0)) {
+    saleDefinitions[OPERATOR_DEFINITION] = SaleDefinition(uint64(0), ~uint64(0), 0, _supply);
   }
 
   /**
@@ -856,7 +918,8 @@ contract MoonStampERC721 is Pausable, Beneficiaries, TokenERC721 {
     }
 
     mintInternal(_recipient, tokenIds);
+    saleDefinition.remainingSupply -= _quantity;
     return true;
   }
 }
-Done in 2.04s.
+Done in 2.20s.
