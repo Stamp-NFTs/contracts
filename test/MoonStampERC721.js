@@ -8,6 +8,9 @@ const assertRevert = require('./helpers/assertRevert');
 const BN = require('bn.js');
 const MoonStampERC721Mock = artifacts.require('MoonStampERC721Mock.sol');
 
+const BASE_URI = 'ipfs//myurl.org/';
+const SUFFIX_URI = '.jons';
+
 const FUTURE = Math.floor(new Date('9999-01-01').getTime() / 1000);
 const TOMORROW = Math.floor(new Date().getTime() / 1000 + 3600 * 24);
 
@@ -22,7 +25,7 @@ contract('MoonStampERC721', function (accounts) {
   let contract;
 
   beforeEach(async function () {
-    contract = await MoonStampERC721Mock.new('MyToken', 'MTK', 'ipfs//myurl.org/', '.json', BASE_SUPPLY);
+    contract = await MoonStampERC721Mock.new('MyToken', 'MTK', BASE_URI, SUFFIX_URI, BASE_SUPPLY);
   });
 
   it('should prevent non owner to define a sale', async function () {
@@ -63,6 +66,21 @@ contract('MoonStampERC721', function (accounts) {
     assert.equal(tx.logs[1].args.from, NULL_ADDRESS, 'from');
     assert.equal(tx.logs[1].args.to, accounts[0], 'to');
     assert.equal(tx.logs[1].args.tokenId, 1, 'tokenId');
+  });
+
+  it('should prevent non owner to define URI', async function () {
+    await assertRevert(
+      contract.defineURI(BASE_URI, SUFFIX_URI, { from: accounts[1] }),
+    'OW01');
+  });
+
+  it('should let owner define URI', async function () {
+    const tx = await contract.defineURI(BASE_URI, SUFFIX_URI);
+    assert.ok(tx.receipt.status, 'Status');
+    assert.equal(tx.logs.length, 1);
+    assert.equal(tx.logs[0].event, 'TemplateURIUpdated', 'event');
+    assert.equal(tx.logs[0].args.baseURI_, BASE_URI, 'baseURI');
+    assert.equal(tx.logs[0].args.suffixURI_, SUFFIX_URI, 'suffixURI');
   });
 
   describe('after operator mint first tokens', function () {

@@ -59,6 +59,18 @@ contract MoonStampERC721 is Pausable, Beneficiaries, TokenERC721 {
   }
 
   /**
+   * @dev defineURI
+   */
+  function defineURI(string memory _baseURI, string memory _suffixURI)
+    external onlyOwner returns (bool)
+  {
+    baseURI_ = _baseURI;
+    suffixURI_ = _suffixURI;
+    emit TemplateURIUpdated(_baseURI, _suffixURI);
+    return true;
+  }
+
+  /**
    * @dev defineSale
    */
   function defineSale(
