@@ -1,6 +1,5 @@
-yarn run v1.22.10
-$ hardhat flatten
 // Sources flattened with hardhat v2.1.1 https://hardhat.org
+// SPDX-License-Identifier: MIT
 
 // File @c-layer/common/contracts/operable/Ownable.sol@v1.3.1
 
@@ -11,8 +10,6 @@ pragma solidity ^0.8.0;
  * @title Ownable
  * @dev The Ownable contract has an owner address, and provides basic authorization control
  * @dev functions, this simplifies the implementation of "user permissions".
- *
- * SPDX-License-Identifier: MIT
  *
  * Error messages
  *   OW01: Message sender is not the owner
@@ -74,14 +71,11 @@ contract Ownable {
 
 // File @c-layer/common/contracts/operable/Operable.sol@v1.3.1
 
-pragma solidity ^0.8.0;
-
 /**
  * @title Operable
  * @dev The Operable contract enable the restrictions of operations to a set of operators
  *
  * @author Cyril Lapinte - <cyril.lapinte@openfiz.com>
- * SPDX-License-Identifier: MIT
  *
  * Error messages
  * OP01: Message sender must be an operator
@@ -148,13 +142,10 @@ contract Operable is Ownable {
 
 // File contracts/Beneficiaries.sol
 
-pragma solidity ^0.8.0;
-
 /**
  * @title Beneficiaries
  * @dev Beneficiaries
  * @author Cyril Lapinte - <cyril@openfiz.com>
- * SPDX-License-Identifier: MIT
  *
  * Error messages
  *   BE01: Beneficiary must be defined
@@ -162,72 +153,38 @@ pragma solidity ^0.8.0;
  */
 contract Beneficiaries is Operable {
 
-  event BeneficiariesDefined(address payable[] addresses, uint32[] _weights);
+  event BeneficiariesDefined(address payable[] addresses);
 
-  struct Beneficiary {
-    address payable address_;
-    uint32 weight;
-    uint256 cumulatedTransferred;
-  }
-
-  uint256 private totalWeight;
-  uint256 private cumulatedWithdrawable;
-
-  Beneficiary[] beneficiaries;
-
-  /*
-   * @dev updateWithdrawable
-   */
-  function updateWithdrawable() internal {
-    cumulatedWithdrawable += msg.value;
-  }
+  address payable[] private beneficiaries;
 
   /*
    * @dev defineBeneficiaries
    */
-  function defineBeneficiaries(
-    address payable[] memory _addresses, uint32[] memory _weights)
+  function defineBeneficiaries(address payable[] memory _addresses)
     public onlyOwner returns (bool)
   {
-    require(_addresses.length == _weights.length, "BE01");
-    for(uint256 i=0; i < beneficiaries.length; i++) {
-      require(beneficiaries[i].cumulatedTransferred == cumulatedWithdrawable, "BE02");
-    }
-    delete beneficiaries;
-
-    totalWeight = 0;
-    cumulatedWithdrawable = 0;
-    for(uint256 i=0; i < _addresses.length; i++) {
-      totalWeight += _weights[i];
-      beneficiaries.push(Beneficiary(_addresses[i], _weights[i], 0));
-    }
-
-    emit BeneficiariesDefined(_addresses, _weights);
+    beneficiaries = _addresses;
+    emit BeneficiariesDefined(_addresses);
     return true;
   }
 
   /**
-   * @dev withdrawETHAll
-   */
-  function withdrawETHAll() external returns (bool success)
-  {
-    for(uint256 i = 0; i < beneficiaries.length; i++) {
-      success = success && this.withdrawETH(uint8(i));
-    }
-  }
-
-  /**
    * @dev withdrawETH
+   * @dev Disclaimer: no guarantees are provided with this method
+   * @dev This method may fail during any ETH transfer if ever:
+   * @dev it runs out of gas
+   * @dev or if the stack becomes too deep
+   * @dev It is the responsability of the user to ensure it works properly
    */
-  function withdrawETH(uint8 _beneficiaryId) external returns (bool)
+  function withdrawETH() public onlyOperator returns (bool)
   {
-    require(_beneficiaryId < beneficiaries.length, "BE03");
-    Beneficiary storage beneficiary = beneficiaries[_beneficiaryId];
-
-    uint256 value = (cumulatedWithdrawable - beneficiary.cumulatedTransferred);
-    beneficiary.cumulatedTransferred += value;
-    // solhint-disable-next-line avoid-call-value, avoid-low-level-calls
-    beneficiary.address_.transfer(value * beneficiary.weight / totalWeight);
+    require(beneficiaries.length > 0, "BE01");
+    uint256 value = address(this).balance / beneficiaries.length;
+    require(value > 0, "BE02");
+    for(uint256 i=0; i < beneficiaries.length; i++) {
+      // solhint-disable-next-line avoid-call-value, avoid-low-level-calls
+      beneficiaries[i].transfer(value);
+    }
     return true;
   }
 }
@@ -235,13 +192,10 @@ contract Beneficiaries is Operable {
 
 // File contracts/mock/BeneficiariesMock.sol
 
-pragma solidity ^0.8.0;
-
 /**
  * @title BeneficiariesMock
  * @dev BeneficiariesMock
  * @author Cyril Lapinte - <cyril@openfiz.com>
- * SPDX-License-Identifier: MIT
  *
  * Error messages
  */
@@ -251,16 +205,12 @@ contract BeneficiariesMock is Beneficiaries {
    */
   //solhint-disable-next-line no-complex-fallback
   receive() external payable {
-    updateWithdrawable();
+    //updateWithdrawable();
   }
 }
 
 
 // File @c-layer/common/contracts/interface/IERC721Metadata.sol@v1.3.1
-
-// SPDX-License-Identifier: MIT
-
-pragma solidity ^0.8.0;
 
 /**
  * @title ERC-721 Non-Fungible Token Standard, optional metadata extension
@@ -276,10 +226,6 @@ interface IERC721Metadata {
 
 // File @c-layer/common/contracts/interface/IERC721Enumerable.sol@v1.3.1
 
-// SPDX-License-Identifier: MIT
-
-pragma solidity ^0.8.0;
-
 /**
  * @title ERC-721 Non-Fungible Token Standard, optional enumeration extension
  * @dev See https://eips.ethereum.org/EIPS/eip-721
@@ -293,12 +239,7 @@ interface IERC721Enumerable {
 
 // File @c-layer/common/contracts/interface/IERC165.sol@v1.3.1
 
-pragma solidity ^0.8.0;
-
-
 /**
- * SPDX-License-Identifier: MIT
- *
  * @dev Interface of the ERC165 standard, as defined in the
  * https://eips.ethereum.org/EIPS/eip-165[EIP].
  *
@@ -322,10 +263,6 @@ interface IERC165 {
 
 
 // File @c-layer/common/contracts/interface/IERC721.sol@v1.3.1
-
-// SPDX-License-Identifier: MIT
-
-pragma solidity ^0.8.0;
 
 /**
  * @dev Required interface of an ERC721 compliant contract.
@@ -352,12 +289,6 @@ interface IERC721 is IERC165 {
 
 // File @c-layer/common/contracts/interface/ITokenERC721.sol@v1.3.1
 
-// SPDX-License-Identifier: MIT
-
-pragma solidity ^0.8.0;
-
-
-
 interface ITokenERC721 is IERC721, IERC721Metadata, IERC721Enumerable {
 
   event TemplateURIUpdated(string baseURI_, string suffixURI_);
@@ -366,10 +297,6 @@ interface ITokenERC721 is IERC721, IERC721Metadata, IERC721Enumerable {
 
 
 // File @c-layer/common/contracts/interface/IERC721TokenReceiver.sol@v1.3.1
-
-// SPDX-License-Identifier: MIT
-
-pragma solidity ^0.8.0;
 
 /*
  * @dev Note: the ERC-165 identifier for this interface is 0x150b7a02.
@@ -395,15 +322,11 @@ interface IERC721TokenReceiver {
 
 // File @c-layer/common/contracts/Account.sol@v1.3.1
 
-pragma solidity ^0.8.0;
-
-
 /**
  * @title Account
  * @dev Utility regarding account interaction
  *
  * @author Cyril Lapinte - <cyril.lapinte@openfiz.com>
- * SPDX-License-Identifier: MIT
  *
  * Error Messages:
  **/
@@ -422,15 +345,11 @@ library Account {
 
 // File @c-layer/common/contracts/convert/Bytes32Convert.sol@v1.3.1
 
-pragma solidity ^0.8.0;
-
-
 /**
  * @title Bytes32Convert
  * @dev Convert bytes32 to string
  *
  * @author Cyril Lapinte - <cyril.lapinte@openfiz.com>
- * SPDX-License-Identifier: MIT
  **/
 library Bytes32Convert {
 
@@ -457,16 +376,10 @@ library Bytes32Convert {
 
 // File @c-layer/common/contracts/token/TokenERC721.sol@v1.3.1
 
-pragma solidity ^0.8.0;
-
-
-
-
 /**
  * @title TokenERC721 contract
  *
  * @author Cyril Lapinte - <cyril.lapinte@openfiz.com>
- * SPDX-License-Identifier: MIT
  * 
  * Error messages
  *   TN01: Token does not exist
@@ -681,13 +594,9 @@ contract TokenERC721 is ITokenERC721 {
 
 // File @c-layer/common/contracts/lifecycle/Pausable.sol@v1.3.1
 
-pragma solidity ^0.8.0;
-
 /**
  * @title Pausable
  * @dev Base contract which allows children to implement an emergency stop mechanism.
- *
- * SPDX-License-Identifier: MIT
  *
  * Error messages
  * PA01: the contract is paused
@@ -736,15 +645,11 @@ contract Pausable is Operable {
 
 // File @c-layer/common/contracts/signer/SignerRecovery.sol@v1.3.1
 
-pragma solidity ^0.8.0;
-
-
 /**
  * @title SignerRecovery
  * @dev Recover the address associated with a signed message
  *
  * @author Cyril Lapinte - <cyril.lapinte@openfiz.com>
- * SPDX-License-Identifier: MIT
  *
  * Error Messages:
  **/
@@ -795,16 +700,10 @@ library SignerRecovery {
 
 // File contracts/MoonStampERC721.sol
 
-pragma solidity ^0.8.0;
-
-
-
-
 /**
  * @title MoonStampERC721 contract
  *
  * @author Cyril Lapinte - <cyril.lapinte@openfiz.com>
- * SPDX-License-Identifier: MIT
  * 
  * Error messages
  *  MS01: The sale must be defined in the future
@@ -846,9 +745,22 @@ contract MoonStampERC721 is Pausable, Beneficiaries, TokenERC721 {
     string memory _name,
     string memory _symbol,
     string memory _baseURI,
+    string memory _suffixURI,
     uint256 _supply
-  ) TokenERC721(_name, _symbol, _baseURI, '', address(0), new uint256[](0)) {
+  ) TokenERC721(_name, _symbol, _baseURI, _suffixURI, address(0), new uint256[](0)) {
     saleDefinitions[OPERATOR_DEFINITION] = SaleDefinition(uint64(0), ~uint64(0), 0, _supply);
+  }
+
+  /**
+   * @dev defineURI
+   */
+  function defineURI(string memory _baseURI, string memory _suffixURI)
+    external onlyOwner returns (bool)
+  {
+    baseURI_ = _baseURI;
+    suffixURI_ = _suffixURI;
+    emit TemplateURIUpdated(_baseURI, _suffixURI);
+    return true;
   }
 
   /**
@@ -899,7 +811,7 @@ contract MoonStampERC721 is Pausable, Beneficiaries, TokenERC721 {
         address signer = _signature.recoverSigner(hash);
         saleDefinition = saleDefinitions[signer];
 
-        require(_signatureValidity >= time, "MS03");
+        require(_signatureValidity >= time && !transactions[hash], "MS03");
         transactions[hash] = true;
       }
 
@@ -922,4 +834,34 @@ contract MoonStampERC721 is Pausable, Beneficiaries, TokenERC721 {
     return true;
   }
 }
-Done in 2.20s.
+
+
+// File contracts/mock/MoonStamERC721Mock.sol
+
+/**
+ * @title MoonStampERC721Mock
+ * @dev MoonStampERC721Mock
+ * @author Cyril Lapinte - <cyril@openfiz.com>
+ *
+ * Error messages
+ */
+contract MoonStampERC721Mock is MoonStampERC721 {
+
+  constructor(
+    string memory _name,
+    string memory _symbol,
+    string memory _baseURI,
+    string memory _suffixURI,
+    uint256 _supply
+  ) MoonStampERC721(_name, _symbol, _baseURI, _suffixURI, _supply) {
+  }
+
+  /**
+   * @dev defineSaleDates function
+   */
+  function defineSaleDates(address _sale, uint64 _startAt, uint64 _endAt) external {
+    saleDefinitions[_sale].startAt = _startAt;
+    saleDefinitions[_sale].endAt = _endAt;
+  }
+}
+Done in 2.25s.

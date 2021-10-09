@@ -71,7 +71,7 @@ contract('MoonStampERC721', function (accounts) {
   it('should prevent non owner to define URI', async function () {
     await assertRevert(
       contract.defineURI(BASE_URI, SUFFIX_URI, { from: accounts[1] }),
-    'OW01');
+      'OW01');
   });
 
   it('should let owner define URI', async function () {
@@ -156,9 +156,34 @@ contract('MoonStampERC721', function (accounts) {
           { from: accounts[1], value: new BN(PRICE_PER_TOKEN_ETH).mul(new BN('2')) });
       });
 
+      it('should have eth in the contract', async function () {
+        const balance = await web3.eth.getBalance(contract.address);
+        assert.equal(balance, new BN(PRICE_PER_TOKEN_ETH).mul(new BN('2')), 'balance');
+      });
+
       it('should not let buyer reuse the approval a seocnd time', async function () {
         await assertRevert(contract.mint(accounts[1], 2, TOMORROW, 1, approval,
           { from: accounts[1], value: new BN(PRICE_PER_TOKEN_ETH).mul(new BN('2')) }), 'MS03');
+      });
+    });
+
+    describe('and with beneficiaries and buyer having minted tokens', function () {
+      beforeEach(async function () {
+        const approval = await approve([ contract.address, accounts[1], 2, TOMORROW, 1 ], accounts[0]);
+        await contract.mint(accounts[1], 2, TOMORROW, 1, approval,
+          { from: accounts[1], value: new BN(PRICE_PER_TOKEN_ETH).mul(new BN('2')) });
+        await contract.defineBeneficiaries([ accounts[2], accounts[3] ]);
+      });
+
+      it('should prevent non operator to withdraw ETH', async function () {
+        await assertRevert(contract.withdrawETH({ from: accounts[2] }), 'OP01');
+      });
+
+      it('should allow operator to withdraw ETH', async function () {
+        const tx = await contract.withdrawETH();
+        assert.ok(tx.receipt.status, 'Status');
+        const balance = await web3.eth.getBalance(contract.address);
+        assert.equal(balance, 0, 'balance');
       });
     });
   });
