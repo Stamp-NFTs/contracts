@@ -224,6 +224,11 @@ contract('MoonStampERC721', function (accounts) {
       await contract.defineSaleDates(1, 0, FUTURE);
     });
 
+    it('should prevent minting within the first price below the price', async function () {
+      await assertRevert(contract.mint(1, accounts[1], 2,
+        { from: accounts[1], value: new BN(PRICE_PER_TOKEN_ETH).mul(new BN('2')).sub(new BN('1')) }), 'MS09');
+    });
+
     it('should let investor mint within the first price', async function () {
       const tx = await contract.mint(1, accounts[1], 2,
         { from: accounts[1], value: new BN(PRICE_PER_TOKEN_ETH).mul(new BN('2')) });
@@ -239,6 +244,11 @@ contract('MoonStampERC721', function (accounts) {
       assert.equal(tx.logs[1].args.tokenId, 1, 'tokenId');
     });
 
+    it('should prevent minting within the first price below the price', async function () {
+      await assertRevert(contract.mint(1, accounts[1], 3,
+        { from: accounts[1], value: new BN(PRICE_PER_TOKEN_ETH).mul(new BN('4')).sub(new BN('1')) }), 'MS09');
+    });
+
     it('should let investor mint within the seconds price', async function () {
       const tx = await contract.mint(1, accounts[1], 3,
         { from: accounts[1], value: new BN(PRICE_PER_TOKEN_ETH).mul(new BN('4')) });
@@ -250,6 +260,24 @@ contract('MoonStampERC721', function (accounts) {
         assert.equal(tx.logs[i].args.to, accounts[1], 'to');
         assert.equal(tx.logs[i].args.tokenId, i, 'tokenId');
       }
+    });
+
+    describe('after minting within the seconds price', function () {
+      beforeEach(async function () {
+        await contract.mint(1, accounts[1], 3,
+          { from: accounts[1], value: new BN(PRICE_PER_TOKEN_ETH).mul(new BN('4')) });
+      });
+
+      it('should have some tokens available', async function () {
+        const saleDefinition = await contract.saleDefinition(1);
+        assert.deepEqual(saleDefinition.remainingSupplies.map((supply) => supply.toString()),
+          [ '0', '2' ]);
+      });
+    });
+
+    it('should prevent minting within all tokens below the price', async function () {
+      await assertRevert(contract.mint(1, accounts[1], 5,
+        { from: accounts[1], value: new BN(PRICE_PER_TOKEN_ETH).mul(new BN('8')).sub(new BN('1')) }), 'MS09');
     });
 
     it('should let investor mint all tokens', async function () {
