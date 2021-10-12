@@ -11,14 +11,14 @@ const MoonStampERC721Mock = artifacts.require('MoonStampERC721Mock.sol');
 const BASE_URI = 'ipfs//myurl.org/';
 const SUFFIX_URI = '.jons';
 
-const FUTURE = Math.floor(new Date('9999-01-01').getTime() / 1000);
+const YERSTEDAY = Math.floor(Math.floor(new Date().getTime() / 1000 - 3600 * 24));
 const TOMORROW = Math.floor(new Date().getTime() / 1000 + 3600 * 24);
+const FUTURE = Math.floor(new Date('9999-01-01').getTime() / 1000);
 
-// const OPERATOR_SALE = '0x'.padEnd(42, '0');
 const PUBLIC_SALE = '0x'.padEnd(42, 'f');
 
 const PRICE_PER_TOKEN_ETH = web3.utils.toWei('1', 'ether');
-const BASE_SUPPLY = 3000;
+const BASE_SUPPLY = '3000';
 const NULL_ADDRESS = '0x'.padEnd(42, '0');
 
 contract('MoonStampERC721', function (accounts) {
@@ -28,34 +28,65 @@ contract('MoonStampERC721', function (accounts) {
     contract = await MoonStampERC721Mock.new('MyToken', 'MTK', BASE_URI, SUFFIX_URI, BASE_SUPPLY);
   });
 
+  it('should have a sale defined', async function () {
+    const saleDefinition = await contract.saleDefinition(0);
+    assert.equal(saleDefinition.signer, NULL_ADDRESS, 'signer');
+
+    const startAt = (await web3.eth.getBlock('latest')).timestamp;
+    assert.equal(saleDefinition.startAt, startAt, 'startAt');
+    assert.equal(saleDefinition.endAt, 0xffffffffffffffff, 'endAt');
+    assert.deepEqual(saleDefinition.tokenPrices.map((x) => x.toString()),
+      [ '0' ], 'tokenPrices');
+    assert.deepEqual(saleDefinition.remainingSupplies.map((x) => x.toString()),
+      [ BASE_SUPPLY ], 'remainingSupplies');
+  });
+
   it('should prevent non owner to define a sale', async function () {
     await assertRevert(
       contract.defineSale(
-        accounts[0], TOMORROW, FUTURE, PRICE_PER_TOKEN_ETH, 1000, { from: accounts[1] }),
+        accounts[0], TOMORROW, FUTURE, [ PRICE_PER_TOKEN_ETH ], [ 1000 ], { from: accounts[1] }),
       'OW01');
+  });
+
+  it('should prevent to define a sale with a negative interval', async function () {
+    await assertRevert(
+      contract.defineSale(
+        accounts[0], FUTURE, TOMORROW, [ PRICE_PER_TOKEN_ETH ], [ 1000 ]),
+      'MS06');
+  });
+
+  it('should prevent to define a sale in the past', async function () {
+    await assertRevert(
+      contract.defineSale(
+        accounts[0], YERSTEDAY, TOMORROW, [ PRICE_PER_TOKEN_ETH ], [ 1000 ]),
+      'MS06');
   });
 
   it('should allow operator to define a sale', async function () {
     const tx = await contract.defineSale(
-      accounts[0], TOMORROW, FUTURE, PRICE_PER_TOKEN_ETH, 1000);
+      accounts[0], TOMORROW, FUTURE, [ PRICE_PER_TOKEN_ETH ], [ 1000 ]);
     assert.ok(tx.receipt.status, 'Status');
     assert.equal(tx.logs.length, 1);
     assert.equal(tx.logs[0].event, 'SaleDefined', 'event');
     assert.equal(tx.logs[0].args.signer, accounts[0], 'owner');
     assert.equal(tx.logs[0].args.startAt, TOMORROW, 'startAt');
     assert.equal(tx.logs[0].args.endAt, FUTURE, 'endAt');
-    assert.equal(tx.logs[0].args.pricePerToken, PRICE_PER_TOKEN_ETH, 'price');
-    assert.equal(tx.logs[0].args.supply, 1000, 'supply');
+    assert.deepEqual(tx.logs[0].args.tokenPrices.map((x) => x.toString()), [ PRICE_PER_TOKEN_ETH ], 'price');
+    assert.deepEqual(tx.logs[0].args.supplies.map((x) => x.toString()), [ '1000' ], 'supply');
   });
 
   it('should prevent non operator to mint', async function () {
     await assertRevert(
-      contract.mint(accounts[0], 2, 0, 0, '0x', { from: accounts[1] }),
-      'MS05');
+      contract.mint(0, accounts[0], 2, { from: accounts[1] }),
+      'MS03');
+  });
+
+  it('should prevent operator to mint too many tokens', async function () {
+    await assertRevert(contract.mint(0, accounts[0], new BN(BASE_SUPPLY).add(new BN('1'))), 'MS10');
   });
 
   it('should let operator mint', async function () {
-    const tx = await contract.mint(accounts[0], 2, 0, 0, '0x');
+    const tx = await contract.mint(0, accounts[0], 2);
     assert.ok(tx.receipt.status, 'Status');
     assert.equal(tx.logs.length, 2);
     assert.equal(tx.logs[0].event, 'Transfer', 'event');
@@ -85,24 +116,91 @@ contract('MoonStampERC721', function (accounts) {
 
   describe('after operator mint first tokens', function () {
     beforeEach(async function () {
-      await contract.mint(accounts[0], 2, 0, 0, '0x');
+      await contract.mint(0, accounts[0], 2);
     });
 
     it('should have remaining supply', async function () {
-      const saleDefinition = await contract.saleDefinitions(NULL_ADDRESS);
-      assert.equal(saleDefinition.remainingSupply, 2998, 'remaining supply');
+      const saleDefinition = await contract.saleDefinition(0);
+      assert.equal(saleDefinition.remainingSupplies[0], 2998, 'remaining supply');
     });
   });
 
-  describe('after operator define a public sale', function () {
+  describe('after an operator has defined a sale', function () {
     beforeEach(async function () {
       await contract.defineSale(
-        PUBLIC_SALE, TOMORROW, FUTURE, PRICE_PER_TOKEN_ETH, 1000);
-      await contract.defineSaleDates(PUBLIC_SALE, 0, FUTURE);
+        PUBLIC_SALE, TOMORROW, FUTURE, [ PRICE_PER_TOKEN_ETH ], [ 1000 ]);
+    });
+
+    it('should have a public sale defined', async function () {
+      const saleDefinition = await contract.saleDefinition(1);
+      assert.equal(saleDefinition.signer.toLowerCase(), PUBLIC_SALE, 'signer');
+      assert.equal(saleDefinition.startAt, TOMORROW, 'startAt');
+      assert.equal(saleDefinition.endAt, FUTURE, 'endAt');
+      assert.deepEqual(saleDefinition.tokenPrices.map((x) => x.toString()),
+        [ PRICE_PER_TOKEN_ETH ], 'tokenPrices');
+      assert.deepEqual(saleDefinition.remainingSupplies.map((x) => x.toString()),
+        [ '1000' ], 'remainingSupplies');
+    });
+
+    it('should prevent non owner to update a sale', async function () {
+      await assertRevert(
+        contract.updateSale(
+          1, accounts[0], TOMORROW, FUTURE, [ PRICE_PER_TOKEN_ETH ], [ 1000 ], { from: accounts[1] }),
+        'OW01');
+    });
+
+    it('should prevent to update a non existent sale', async function () {
+      await assertRevert(
+        contract.updateSale(
+          2, accounts[0], TOMORROW, FUTURE, [ PRICE_PER_TOKEN_ETH ], [ 1000 ]),
+        'MS01');
+    });
+
+    it('should prevent to update a sale with a negative interval', async function () {
+      await assertRevert(
+        contract.updateSale(
+          1, accounts[0], FUTURE, TOMORROW, [ PRICE_PER_TOKEN_ETH ], [ 1000 ]),
+        'MS06');
+    });
+
+    it('should prevent to update a sale in the past', async function () {
+      await assertRevert(
+        contract.updateSale(
+          1, accounts[0], YERSTEDAY, TOMORROW, [ PRICE_PER_TOKEN_ETH ], [ 1000 ]),
+        'MS06');
+    });
+
+    it('should allow operator to update a sale', async function () {
+      const tx = await contract.updateSale(
+        1, accounts[1], TOMORROW + 1, FUTURE + 1, [ new BN(PRICE_PER_TOKEN_ETH).add(new BN('2')) ], [ 1001 ]);
+      assert.ok(tx.receipt.status, 'Status');
+      assert.equal(tx.logs.length, 1);
+      assert.equal(tx.logs[0].event, 'SaleUpdated', 'event');
+      assert.equal(tx.logs[0].args.signer, accounts[1], 'owner');
+      assert.equal(tx.logs[0].args.startAt, TOMORROW + 1, 'startAt');
+      assert.equal(tx.logs[0].args.endAt, FUTURE + 1, 'endAt');
+      assert.deepEqual(tx.logs[0].args.tokenPrices.map((x) => x.toString()),
+        [ new BN(PRICE_PER_TOKEN_ETH).add(new BN('2')).toString() ], 'price');
+      assert.deepEqual(tx.logs[0].args.supplies.map((x) => x.toString()), [ '1001' ], 'supply');
+    });
+  });
+
+  describe('after a public sale has started', function () {
+    beforeEach(async function () {
+      await contract.defineSale(
+        PUBLIC_SALE, TOMORROW, FUTURE, [ PRICE_PER_TOKEN_ETH ], [ 1000 ]);
+      await contract.defineSaleDates(1, 0, FUTURE);
+    });
+
+    it('should prevent non owner to update a sale', async function () {
+      await assertRevert(
+        contract.updateSale(
+          1, accounts[0], TOMORROW, FUTURE, [ PRICE_PER_TOKEN_ETH ], [ 1000 ], { from: accounts[1] }),
+        'OW01');
     });
 
     it('should let investor mint', async function () {
-      const tx = await contract.mint(accounts[1], 2, 0, 0, '0x',
+      const tx = await contract.mint(1, accounts[1], 2,
         { from: accounts[1], value: new BN(PRICE_PER_TOKEN_ETH).mul(new BN('2')) });
       assert.ok(tx.receipt.status, 'Status');
       assert.equal(tx.logs.length, 2);
@@ -117,8 +215,59 @@ contract('MoonStampERC721', function (accounts) {
     });
   });
 
-  describe('after operator define a sale with "approval" required', function () {
-    const approveTypes = [ 'address', 'address', 'uint8', 'uint64', 'uint64'];
+  describe('after a public sale with multple prices has started', function () {
+    beforeEach(async function () {
+      await contract.defineSale(
+        PUBLIC_SALE, TOMORROW, FUTURE,
+        [ PRICE_PER_TOKEN_ETH, new BN(PRICE_PER_TOKEN_ETH).mul(new BN('2')) ],
+        [ 2, 3 ]);
+      await contract.defineSaleDates(1, 0, FUTURE);
+    });
+
+    it('should let investor mint within the first price', async function () {
+      const tx = await contract.mint(1, accounts[1], 2,
+        { from: accounts[1], value: new BN(PRICE_PER_TOKEN_ETH).mul(new BN('2')) });
+      assert.ok(tx.receipt.status, 'Status');
+      assert.equal(tx.logs.length, 2);
+      assert.equal(tx.logs[0].event, 'Transfer', 'event');
+      assert.equal(tx.logs[0].args.from, NULL_ADDRESS, 'from');
+      assert.equal(tx.logs[0].args.to, accounts[1], 'to');
+      assert.equal(tx.logs[0].args.tokenId, 0, 'tokenId');
+      assert.equal(tx.logs[1].event, 'Transfer', 'event');
+      assert.equal(tx.logs[1].args.from, NULL_ADDRESS, 'from');
+      assert.equal(tx.logs[1].args.to, accounts[1], 'to');
+      assert.equal(tx.logs[1].args.tokenId, 1, 'tokenId');
+    });
+
+    it('should let investor mint within the seconds price', async function () {
+      const tx = await contract.mint(1, accounts[1], 3,
+        { from: accounts[1], value: new BN(PRICE_PER_TOKEN_ETH).mul(new BN('4')) });
+      assert.ok(tx.receipt.status, 'Status');
+      assert.equal(tx.logs.length, 3);
+      for (let i = 0; i < tx.logs.length; i++) {
+        assert.equal(tx.logs[i].event, 'Transfer', 'event');
+        assert.equal(tx.logs[i].args.from, NULL_ADDRESS, 'from');
+        assert.equal(tx.logs[i].args.to, accounts[1], 'to');
+        assert.equal(tx.logs[i].args.tokenId, i, 'tokenId');
+      }
+    });
+
+    it('should let investor mint all tokens', async function () {
+      const tx = await contract.mint(1, accounts[1], 5,
+        { from: accounts[1], value: new BN(PRICE_PER_TOKEN_ETH).mul(new BN('8')) });
+      assert.ok(tx.receipt.status, 'Status');
+      assert.equal(tx.logs.length, 5);
+      for (let i = 0; i < tx.logs.length; i++) {
+        assert.equal(tx.logs[i].event, 'Transfer', 'event');
+        assert.equal(tx.logs[i].args.from, NULL_ADDRESS, 'from');
+        assert.equal(tx.logs[i].args.to, accounts[1], 'to');
+        assert.equal(tx.logs[i].args.tokenId, i, 'tokenId');
+      }
+    });
+  });
+
+  describe('after a sale with "approval" required has started', function () {
+    const approveTypes = [ 'address', 'uint32', 'address', 'uint8', 'uint64', 'uint64'];
     const approve = async function (values, approver) {
       const encodedParams = web3.eth.abi.encodeParameters(approveTypes, values);
       const hash = web3.utils.sha3(encodedParams, { encoding: 'hex' });
@@ -127,13 +276,30 @@ contract('MoonStampERC721', function (accounts) {
 
     beforeEach(async function () {
       await contract.defineSale(
-        accounts[0], TOMORROW, FUTURE, PRICE_PER_TOKEN_ETH, 1000);
-      await contract.defineSaleDates(accounts[0], 0, FUTURE);
+        accounts[0], TOMORROW, FUTURE, [ PRICE_PER_TOKEN_ETH ], [ 1000 ]);
+      await contract.defineSaleDates(1, 0, FUTURE);
+    });
+
+    it('should not allow to mint without approval', async function () {
+      await assertRevert(contract.mint(1, accounts[1], 2,
+        { from: accounts[1], value: new BN(PRICE_PER_TOKEN_ETH).mul(new BN('2')) }), 'MS03');
+    });
+
+    it('should not allow to mint with an invalid approval', async function () {
+      const approval = await approve([ contract.address, 1, accounts[1], 2, TOMORROW, 1 ], accounts[0]);
+      await assertRevert(contract.mintWithApproval(1, accounts[1], 3, TOMORROW, 1, approval,
+        { from: accounts[1], value: new BN(PRICE_PER_TOKEN_ETH).mul(new BN('2')) }), 'MS04');
+    });
+
+    it('should not allow to mint with an outdated approval', async function () {
+      const approval = await approve([ contract.address, 1, accounts[1], 2, YERSTEDAY, 1 ], accounts[0]);
+      await assertRevert(contract.mintWithApproval(1, accounts[1], 2, YERSTEDAY, 1, approval,
+        { from: accounts[1], value: new BN(PRICE_PER_TOKEN_ETH).mul(new BN('2')) }), 'MS05');
     });
 
     it('should have let buyer come and mint himself tokens with approval', async function () {
-      const approval = await approve([ contract.address, accounts[1], 2, TOMORROW, 1 ], accounts[0]);
-      const tx = await contract.mint(accounts[1], 2, TOMORROW, 1, approval,
+      const approval = await approve([ contract.address, 1, accounts[1], 2, TOMORROW, 1 ], accounts[0]);
+      const tx = await contract.mintWithApproval(1, accounts[1], 2, TOMORROW, 1, approval,
         { from: accounts[1], value: new BN(PRICE_PER_TOKEN_ETH).mul(new BN('2')) });
       assert.ok(tx.receipt.status, 'Status');
       assert.equal(tx.logs.length, 2);
@@ -151,8 +317,8 @@ contract('MoonStampERC721', function (accounts) {
       let approval;
 
       beforeEach(async function () {
-        approval = await approve([ contract.address, accounts[1], 2, TOMORROW, 1 ], accounts[0]);
-        await contract.mint(accounts[1], 2, TOMORROW, 1, approval,
+        approval = await approve([ contract.address, 1, accounts[1], 2, TOMORROW, 1 ], accounts[0]);
+        await contract.mintWithApproval(1, accounts[1], 2, TOMORROW, 1, approval,
           { from: accounts[1], value: new BN(PRICE_PER_TOKEN_ETH).mul(new BN('2')) });
       });
 
@@ -162,15 +328,15 @@ contract('MoonStampERC721', function (accounts) {
       });
 
       it('should not let buyer reuse the approval a seocnd time', async function () {
-        await assertRevert(contract.mint(accounts[1], 2, TOMORROW, 1, approval,
-          { from: accounts[1], value: new BN(PRICE_PER_TOKEN_ETH).mul(new BN('2')) }), 'MS03');
+        await assertRevert(contract.mintWithApproval(1, accounts[1], 2, TOMORROW, 1, approval,
+          { from: accounts[1], value: new BN(PRICE_PER_TOKEN_ETH).mul(new BN('2')) }), 'MS05');
       });
     });
 
     describe('and with beneficiaries and buyer having minted tokens', function () {
       beforeEach(async function () {
-        const approval = await approve([ contract.address, accounts[1], 2, TOMORROW, 1 ], accounts[0]);
-        await contract.mint(accounts[1], 2, TOMORROW, 1, approval,
+        const approval = await approve([ contract.address, 1, accounts[1], 2, TOMORROW, 1 ], accounts[0]);
+        await contract.mintWithApproval(1, accounts[1], 2, TOMORROW, 1, approval,
           { from: accounts[1], value: new BN(PRICE_PER_TOKEN_ETH).mul(new BN('2')) });
         await contract.defineBeneficiaries([ accounts[2], accounts[3] ]);
       });

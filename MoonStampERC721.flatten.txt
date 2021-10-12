@@ -1,4 +1,5 @@
 // Sources flattened with hardhat v2.1.1 https://hardhat.org
+// @author Cyril Lapinte - <cyril.lapinte@openfiz.com>
 // SPDX-License-Identifier: MIT
 
 // File @c-layer/common/contracts/operable/Ownable.sol@v1.3.1
@@ -706,39 +707,57 @@ library SignerRecovery {
  * @author Cyril Lapinte - <cyril.lapinte@openfiz.com>
  * 
  * Error messages
- *  MS01: The sale must be defined in the future
+ *  MS01: The saleId must be valid
  *  MS02: The sale must not be started
- *  MS03: The signature is not valid anymore
- *  MS04: Enough ethers must be provided
- *  MS05: The sale is close
- *  MS06: No more tokens are available 
+ *  MS03: Sale is not public
+ *  MS04: Invalid signature
+ *  MS05: The signature is not valid anymore
+ *  MS06: The sale must be defined in the future
+ *  MS07: Inconsistent price definitions
+ *  MS08: The sale is close
+ *  MS09: Enough ethers must be provided
+ *  MS10: Not enought tokens are available
  */
 contract MoonStampERC721 is Pausable, Beneficiaries, TokenERC721 {
   using SignerRecovery for bytes;
 
+  address internal constant OPERATOR_DEFINITION = address(0);
+  address internal constant NO_SIGNER_DEFINITION = address(~uint160(0));
+
   event SaleDefined(
+    uint32 saleId,
     address signer,
     uint64 startAt,
     uint64 endAt,
-    uint256 pricePerToken,
-    uint256 supply);
+    uint256[] tokenPrices,
+    uint256[] supplies);
 
-  address internal constant OPERATOR_DEFINITION = address(0);
-  address internal constant NOSIGNER_DEFINITION = address(~uint160(0));
+  event SaleUpdated(
+    uint32 saleId,
+    address signer,
+    uint64 startAt,
+    uint64 endAt,
+    uint256[] tokenPrices,
+    uint256[] supplies);
+
+  struct PriceDefinition {
+    uint256 tokenPrice;
+    uint256 remainingSupply;
+  }
 
   struct SaleDefinition {
+    address signer;
     uint64 startAt;
     uint64 endAt;
 
-    uint256 pricePerToken;
-    uint256 remainingSupply;
+    PriceDefinition[] priceDefinitions;
   }
 
   // A definition may exist for different signers
   // Two special definitions exist:
-  // OPERATOR_DEFINITION: operators may have a minting allowance
-  // NOSIGNER_DEFINIITON: if no signer approval is provided
-  mapping(address => SaleDefinition) public saleDefinitions;
+  // OPERATOR_DEFINITION: only operators may have a minting allowance
+  // NO_SIGNER_DEFINIITON: no signer approval is required
+  SaleDefinition[] internal saleDefinitions;
   mapping(bytes32 => bool) internal transactions;
 
   constructor(
@@ -748,7 +767,41 @@ contract MoonStampERC721 is Pausable, Beneficiaries, TokenERC721 {
     string memory _suffixURI,
     uint256 _supply
   ) TokenERC721(_name, _symbol, _baseURI, _suffixURI, address(0), new uint256[](0)) {
-    saleDefinitions[OPERATOR_DEFINITION] = SaleDefinition(uint64(0), ~uint64(0), 0, _supply);
+    uint256[] memory supplies = new uint256[](1);
+    supplies[0] = _supply;
+
+    defineSale(
+      OPERATOR_DEFINITION,
+      uint64(block.timestamp), //solhint-disable-line
+      ~uint64(0),
+      new uint256[](1),
+      supplies);
+  }
+
+  /**
+   * @dev saleDefinition
+   */
+  function saleDefinition(uint16 _sale) public view returns (
+    address signer,
+    uint64 startAt,
+    uint64 endAt,
+    uint256[] memory tokenPrices,
+    uint256[] memory remainingSupplies)
+  {
+    SaleDefinition storage saleDefinition_ = saleDefinitions[_sale];
+
+    tokenPrices = new uint256[](saleDefinition_.priceDefinitions.length);
+    remainingSupplies = new uint256[](saleDefinition_.priceDefinitions.length);
+    for(uint256 i=0; i < saleDefinition_.priceDefinitions.length; i++) {
+      tokenPrices[i] = saleDefinition_.priceDefinitions[i].tokenPrice;
+      remainingSupplies[i] = saleDefinition_.priceDefinitions[i].remainingSupply;
+    }
+
+    return (saleDefinition_.signer,
+      saleDefinition_.startAt,
+      saleDefinition_.endAt,
+      tokenPrices,
+      remainingSupplies);
   }
 
   /**
@@ -770,19 +823,36 @@ contract MoonStampERC721 is Pausable, Beneficiaries, TokenERC721 {
     address _signer,
     uint64 _startAt,
     uint64 _endAt,
-    uint256 _pricePerToken,
-    uint256 _supply) external onlyOwner returns (bool)
+    uint256[] memory _tokenPrices,
+    uint256[] memory _supplies) public onlyOwner returns (bool)
   {
-    // solhint-disable-next-line
-    uint256 time = block.timestamp;
-    require(_startAt > time && _startAt <= _endAt, "MS01");
-    require (saleDefinitions[_signer].startAt == 0
-      || saleDefinitions[_signer].startAt > time, "MS02");
-    saleDefinitions[_signer] =
-      SaleDefinition(_startAt, _endAt, _pricePerToken, _supply);
+    saleDefinitions.push();
+    uint32 saleId = uint32(saleDefinitions.length)-1;
+    updateSaleInternal(
+      saleId, _signer, _startAt, _endAt, _tokenPrices, _supplies);
+    emit SaleDefined(saleId, _signer, _startAt, _endAt, _tokenPrices, _supplies);
+    return true;
+  }
 
-    emit SaleDefined(
-      _signer, _startAt, _endAt, _pricePerToken, _supply);
+  /**
+   * @dev updateSale
+   */
+  function updateSale(
+    uint32 _saleId,
+    address _signer,
+    uint64 _startAt,
+    uint64 _endAt,
+    uint256[] calldata _tokenPrices,
+    uint256[] calldata _supplies) external onlyOwner returns (bool)
+  {
+    require(_saleId < saleDefinitions.length, "MS01");
+    uint64 startAt = saleDefinitions[_saleId].startAt;
+    // solhint-disable-next-line
+    require (startAt == 0 || startAt > block.timestamp, "MS02");
+    updateSaleInternal(_saleId, _signer, _startAt, _endAt, _tokenPrices, _supplies);
+
+    emit SaleUpdated(
+      _saleId, _signer, _startAt, _endAt, _tokenPrices, _supplies);
     return true;
   }
 
@@ -790,39 +860,101 @@ contract MoonStampERC721 is Pausable, Beneficiaries, TokenERC721 {
    * @dev mint
    */
   function mint(
+    uint32 _sale,
+    address _recipient,
+    uint256 _quantity) external payable whenNotPaused returns (bool)
+  {
+    if (!isOperator(msg.sender)) {
+      require(saleDefinitions[_sale].signer == NO_SIGNER_DEFINITION, "MS03");
+    }
+    return mintInternal(_sale, _recipient, _quantity);
+  }
+
+  /**
+   * @dev mintWithApproval
+   */
+  function mintWithApproval(
+    uint32 _sale,
     address _recipient,
     uint8 _quantity,
     uint64 _signatureValidity,
     uint64 _signatureNonce,
     bytes memory _signature) external payable whenNotPaused returns (bool)
   {
+    bytes32 hash = keccak256(abi.encode(
+      address(this), _sale, msg.sender, _quantity, _signatureValidity, _signatureNonce)
+    );
+
+    address signer = _signature.recoverSigner(hash);
+    require(saleDefinitions[_sale].signer == signer, "MS04");
+
+    // solhint-disable-next-line
+    require(_signatureValidity >= block.timestamp && !transactions[hash], "MS05");
+    transactions[hash] = true;
+
+    return mintInternal(_sale, _recipient, _quantity);
+  }
+
+  /**
+   * @dev updateSaleInternal
+   */
+  function updateSaleInternal(
+    uint32 _saleId,
+    address _signer,
+    uint64 _startAt,
+    uint64 _endAt,
+    uint256[] memory _tokenPrices,
+    uint256[] memory _supplies) internal
+  {
+    // solhint-disable-next-line
+    require(_startAt >= block.timestamp && _startAt <= _endAt, "MS06");
+    require(_tokenPrices.length == _supplies.length, "MS07");
+
+    SaleDefinition storage saleDefinition_ = saleDefinitions[_saleId];
+    saleDefinition_.signer = _signer;
+    saleDefinition_.startAt = _startAt;
+    saleDefinition_.endAt = _endAt;
+
+    PriceDefinition[] storage priceDefinitions =
+      saleDefinition_.priceDefinitions;
+    delete saleDefinition_.priceDefinitions;
+    for(uint256 i=0; i< _tokenPrices.length; i++) {
+      priceDefinitions.push(
+        PriceDefinition(_tokenPrices[i], _supplies[i]));
+    }
+  }
+
+  /*
+   * @dev mintInternal
+   */
+  function mintInternal(
+    uint32 _sale,
+    address _recipient,
+    uint256 _quantity) internal returns (bool)
+  {
+    SaleDefinition storage saleDefinition_ = saleDefinitions[_sale];
+
     // solhint-disable-next-line
     uint256 time = block.timestamp;
+    require(time > saleDefinition_.startAt
+      && time <= saleDefinition_.endAt, "MS08");
 
-    SaleDefinition storage saleDefinition; 
-    if (!isOperator(msg.sender)) {
-      if (_signature.length == 0) {
-        saleDefinition = saleDefinitions[NOSIGNER_DEFINITION];
-      } else {
-        bytes32 hash = keccak256(abi.encode(
-          address(this), msg.sender, _quantity, _signatureValidity, _signatureNonce)
-        );
-
-        address signer = _signature.recoverSigner(hash);
-        saleDefinition = saleDefinitions[signer];
-
-        require(_signatureValidity >= time && !transactions[hash], "MS03");
-        transactions[hash] = true;
+    uint256 quantity = _quantity;
+    uint256 price;
+    for(uint256 i=0; i < saleDefinition_.priceDefinitions.length && quantity != 0; i++) {
+      PriceDefinition storage priceDefinition = saleDefinition_.priceDefinitions[i];
+      if (priceDefinition.remainingSupply != 0) {
+        uint256 quantityAtPrice = (quantity > priceDefinition.remainingSupply) ? priceDefinition.remainingSupply : quantity;
+        price += quantityAtPrice * priceDefinition.tokenPrice;
+        quantity -= quantityAtPrice;
+        priceDefinition.remainingSupply -= quantityAtPrice;
       }
-
-      require(msg.value >= _quantity * saleDefinition.pricePerToken, "MS04");
-    } else {
-      saleDefinition = saleDefinitions[OPERATOR_DEFINITION];
     }
 
-    require(time > saleDefinition.startAt
-      && time <= saleDefinition.endAt, "MS05");
-    require(_quantity <= saleDefinition.remainingSupply, "MS06");
+    if(!isOperator(msg.sender)) {
+      require(msg.value >= price, "MS09");
+    }
+    require(quantity == 0, "MS10");
 
     uint256[] memory tokenIds = new uint256[](_quantity);
     for(uint256 i=0; i < _quantity; i++) {
@@ -830,7 +962,6 @@ contract MoonStampERC721 is Pausable, Beneficiaries, TokenERC721 {
     }
 
     mintInternal(_recipient, tokenIds);
-    saleDefinition.remainingSupply -= _quantity;
     return true;
   }
 }
@@ -859,9 +990,8 @@ contract MoonStampERC721Mock is MoonStampERC721 {
   /**
    * @dev defineSaleDates function
    */
-  function defineSaleDates(address _sale, uint64 _startAt, uint64 _endAt) external {
+  function defineSaleDates(uint16 _sale, uint64 _startAt, uint64 _endAt) external {
     saleDefinitions[_sale].startAt = _startAt;
     saleDefinitions[_sale].endAt = _endAt;
   }
 }
-Done in 2.25s.

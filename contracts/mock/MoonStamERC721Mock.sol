@@ -25,7 +25,7 @@ contract MoonStampERC721Mock is MoonStampERC721 {
   /**
    * @dev defineSaleDates function
    */
-  function defineSaleDates(address _sale, uint64 _startAt, uint64 _endAt) external {
+  function defineSaleDates(uint16 _sale, uint64 _startAt, uint64 _endAt) external {
     saleDefinitions[_sale].startAt = _startAt;
     saleDefinitions[_sale].endAt = _endAt;
   }
