@@ -64,7 +64,7 @@ contract MoonStampERC721 is Pausable, Beneficiaries, TokenERC721 {
   // OPERATOR_DEFINITION: only operators may have a minting allowance
   // NO_SIGNER_DEFINIITON: no signer approval is required
   SaleDefinition[] internal saleDefinitions;
-  mapping(bytes32 => bool) internal transactions;
+  mapping(address => uint256) public minted;
 
   constructor(
     string memory _name,
@@ -184,19 +184,17 @@ contract MoonStampERC721 is Pausable, Beneficiaries, TokenERC721 {
     address _recipient,
     uint8 _quantity,
     uint64 _signatureValidity,
-    uint64 _signatureNonce,
     bytes memory _signature) external payable whenNotPaused returns (bool)
   {
     bytes32 hash = keccak256(abi.encode(
-      address(this), _sale, msg.sender, _quantity, _signatureValidity, _signatureNonce)
+      address(this), _sale, msg.sender, _quantity, _signatureValidity, minted[msg.sender])
     );
 
     address signer = _signature.recoverSigner(hash);
     require(saleDefinitions[_sale].signer == signer, "MS04");
 
     // solhint-disable-next-line
-    require(_signatureValidity >= block.timestamp && !transactions[hash], "MS05");
-    transactions[hash] = true;
+    require(_signatureValidity >= block.timestamp, "MS05");
 
     return mintInternal(_sale, _recipient, _quantity);
   }
@@ -262,12 +260,13 @@ contract MoonStampERC721 is Pausable, Beneficiaries, TokenERC721 {
     }
     require(quantity == 0, "MS10");
 
+    minted[msg.sender] += _quantity;
     uint256[] memory tokenIds = new uint256[](_quantity);
     for(uint256 i=0; i < _quantity; i++) {
       tokenIds[i] = i + totalSupply_;
     }
 
-    mintInternal(_recipient, tokenIds);
+    super.mintInternal(_recipient, tokenIds);
     return true;
   }
 }

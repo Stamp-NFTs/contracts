@@ -28,6 +28,11 @@ contract('MoonStampERC721', function (accounts) {
     contract = await MoonStampERC721Mock.new('MyToken', 'MTK', BASE_URI, SUFFIX_URI, BASE_SUPPLY);
   });
 
+  it('should have a minted value', async function () {
+    const minted = await contract.minted(accounts[0]);
+    assert.equal(minted.toString(), "0", 'minted');
+  });
+
   it('should have a sale defined', async function () {
     const saleDefinition = await contract.saleDefinition(0);
     assert.equal(saleDefinition.signer, NULL_ADDRESS, 'signer');
@@ -295,7 +300,7 @@ contract('MoonStampERC721', function (accounts) {
   });
 
   describe('after a sale with "approval" required has started', function () {
-    const approveTypes = [ 'address', 'uint32', 'address', 'uint8', 'uint64', 'uint64'];
+    const approveTypes = [ 'address', 'uint32', 'address', 'uint8', 'uint64', 'uint256'];
     const approve = async function (values, approver) {
       const encodedParams = web3.eth.abi.encodeParameters(approveTypes, values);
       const hash = web3.utils.sha3(encodedParams, { encoding: 'hex' });
@@ -314,20 +319,20 @@ contract('MoonStampERC721', function (accounts) {
     });
 
     it('should not allow to mint with an invalid approval', async function () {
-      const approval = await approve([ contract.address, 1, accounts[1], 2, TOMORROW, 1 ], accounts[0]);
-      await assertRevert(contract.mintWithApproval(1, accounts[1], 3, TOMORROW, 1, approval,
+      const approval = await approve([ contract.address, 1, accounts[1], 2, TOMORROW, 0 ], accounts[0]);
+      await assertRevert(contract.mintWithApproval(1, accounts[1], 3, TOMORROW, approval,
         { from: accounts[1], value: new BN(PRICE_PER_TOKEN_ETH).mul(new BN('2')) }), 'MS04');
     });
 
     it('should not allow to mint with an outdated approval', async function () {
-      const approval = await approve([ contract.address, 1, accounts[1], 2, YERSTEDAY, 1 ], accounts[0]);
-      await assertRevert(contract.mintWithApproval(1, accounts[1], 2, YERSTEDAY, 1, approval,
+      const approval = await approve([ contract.address, 1, accounts[1], 2, YERSTEDAY, 0 ], accounts[0]);
+      await assertRevert(contract.mintWithApproval(1, accounts[1], 2, YERSTEDAY, approval,
         { from: accounts[1], value: new BN(PRICE_PER_TOKEN_ETH).mul(new BN('2')) }), 'MS05');
     });
 
     it('should have let buyer come and mint himself tokens with approval', async function () {
-      const approval = await approve([ contract.address, 1, accounts[1], 2, TOMORROW, 1 ], accounts[0]);
-      const tx = await contract.mintWithApproval(1, accounts[1], 2, TOMORROW, 1, approval,
+      const approval = await approve([ contract.address, 1, accounts[1], 2, TOMORROW, 0 ], accounts[0]);
+      const tx = await contract.mintWithApproval(1, accounts[1], 2, TOMORROW, approval,
         { from: accounts[1], value: new BN(PRICE_PER_TOKEN_ETH).mul(new BN('2')) });
       assert.ok(tx.receipt.status, 'Status');
       assert.equal(tx.logs.length, 2);
@@ -341,13 +346,18 @@ contract('MoonStampERC721', function (accounts) {
       assert.equal(tx.logs[1].args.tokenId, 1, 'tokenId');
     });
 
-    describe('and after the buyer minted its first token', function () {
+    describe('and after the buyer minted its first tokens', function () {
       let approval;
 
       beforeEach(async function () {
-        approval = await approve([ contract.address, 1, accounts[1], 2, TOMORROW, 1 ], accounts[0]);
-        await contract.mintWithApproval(1, accounts[1], 2, TOMORROW, 1, approval,
+        approval = await approve([ contract.address, 1, accounts[1], 2, TOMORROW, 0 ], accounts[0]);
+        await contract.mintWithApproval(1, accounts[1], 2, TOMORROW, approval,
           { from: accounts[1], value: new BN(PRICE_PER_TOKEN_ETH).mul(new BN('2')) });
+      });
+
+      it('should have a minted value', async function () {
+        const minted = await contract.minted(accounts[1]);
+        assert.equal(minted.toString(), "2", 'minted');
       });
 
       it('should have eth in the contract', async function () {
@@ -355,16 +365,32 @@ contract('MoonStampERC721', function (accounts) {
         assert.equal(balance, new BN(PRICE_PER_TOKEN_ETH).mul(new BN('2')), 'balance');
       });
 
-      it('should not let buyer reuse the approval a seocnd time', async function () {
-        await assertRevert(contract.mintWithApproval(1, accounts[1], 2, TOMORROW, 1, approval,
-          { from: accounts[1], value: new BN(PRICE_PER_TOKEN_ETH).mul(new BN('2')) }), 'MS05');
+      it('should not let the buyer reuse the approval a seocnd time', async function () {
+        await assertRevert(contract.mintWithApproval(1, accounts[1], 2, TOMORROW, approval,
+          { from: accounts[1], value: new BN(PRICE_PER_TOKEN_ETH).mul(new BN('2')) }), 'MS04');
+      });
+
+      it('should let the buyer mint a seocnd time with a new approval', async function () {
+        approval = await approve([ contract.address, 1, accounts[1], 2, TOMORROW, 2 ], accounts[0]);
+        const tx =await contract.mintWithApproval(1, accounts[1], 2, TOMORROW, approval,
+          { from: accounts[1], value: new BN(PRICE_PER_TOKEN_ETH).mul(new BN('2')) });
+        assert.ok(tx.receipt.status, 'Status');
+        assert.equal(tx.logs.length, 2);
+        assert.equal(tx.logs[0].event, 'Transfer', 'event');
+        assert.equal(tx.logs[0].args.from, NULL_ADDRESS, 'from');
+        assert.equal(tx.logs[0].args.to, accounts[1], 'to');
+        assert.equal(tx.logs[0].args.tokenId, 2, 'tokenId');
+        assert.equal(tx.logs[1].event, 'Transfer', 'event');
+        assert.equal(tx.logs[1].args.from, NULL_ADDRESS, 'from');
+        assert.equal(tx.logs[1].args.to, accounts[1], 'to');
+        assert.equal(tx.logs[1].args.tokenId, 3, 'tokenId');
       });
     });
 
     describe('and with beneficiaries and buyer having minted tokens', function () {
       beforeEach(async function () {
-        const approval = await approve([ contract.address, 1, accounts[1], 2, TOMORROW, 1 ], accounts[0]);
-        await contract.mintWithApproval(1, accounts[1], 2, TOMORROW, 1, approval,
+        const approval = await approve([ contract.address, 1, accounts[1], 2, TOMORROW, 0 ], accounts[0]);
+        await contract.mintWithApproval(1, accounts[1], 2, TOMORROW, approval,
           { from: accounts[1], value: new BN(PRICE_PER_TOKEN_ETH).mul(new BN('2')) });
         await contract.defineBeneficiaries([ accounts[2], accounts[3] ]);
       });
