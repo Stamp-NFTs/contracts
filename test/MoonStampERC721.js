@@ -30,7 +30,7 @@ contract('MoonStampERC721', function (accounts) {
 
   it('should have a minted value', async function () {
     const minted = await contract.minted(accounts[0]);
-    assert.equal(minted.toString(), "0", 'minted');
+    assert.equal(minted.toString(), '0', 'minted');
   });
 
   it('should have a sale defined', async function () {
@@ -357,7 +357,7 @@ contract('MoonStampERC721', function (accounts) {
 
       it('should have a minted value', async function () {
         const minted = await contract.minted(accounts[1]);
-        assert.equal(minted.toString(), "2", 'minted');
+        assert.equal(minted.toString(), '2', 'minted');
       });
 
       it('should have eth in the contract', async function () {
@@ -372,7 +372,7 @@ contract('MoonStampERC721', function (accounts) {
 
       it('should let the buyer mint a seocnd time with a new approval', async function () {
         approval = await approve([ contract.address, 1, accounts[1], 2, TOMORROW, 2 ], accounts[0]);
-        const tx =await contract.mintWithApproval(1, accounts[1], 2, TOMORROW, approval,
+        const tx = await contract.mintWithApproval(1, accounts[1], 2, TOMORROW, approval,
           { from: accounts[1], value: new BN(PRICE_PER_TOKEN_ETH).mul(new BN('2')) });
         assert.ok(tx.receipt.status, 'Status');
         assert.equal(tx.logs.length, 2);
