@@ -23,10 +23,10 @@
     chalk "^2.0.0"
     js-tokens "^4.0.0"
 
-"@c-layer/common@^1.3.1":
-  version "1.3.1"
-  resolved "https://registry.yarnpkg.com/@c-layer/common/-/common-1.3.1.tgz#cdf2e55691c80818dc7ed89f786e1a3ce3b807a8"
-  integrity sha512-FSAvA/o6fAv0S2allliK25fcFddxZukdMd2VYuDeMX/hH1Xf0t5GQYFs+gVfBILwslInMqTmpxkOTGwkEVt2og==
+"@c-layer/common@^1.3.2":
+  version "1.3.2"
+  resolved "https://registry.yarnpkg.com/@c-layer/common/-/common-1.3.2.tgz#977f56f4d2d23d7c7df2165f675423db9219081b"
+  integrity sha512-fI91PRlsxCS6Aka1f8ND5pXBdpvJwvUf50uHfTIAboW4eM0eZMsat0ktSruCFW4hpsJdBMrEglI2fI0Zuir33g==
 
 "@ethersproject/abi@5.0.0-beta.153":
   version "5.0.0-beta.153"

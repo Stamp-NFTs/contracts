@@ -37,7 +37,7 @@
   },
   "homepage": "https://etherscan.io/",
   "dependencies": {
-    "@c-layer/common": "^1.3.1"
+    "@c-layer/common": "^1.3.2"
   },
   "devDependencies": {
     "@nomiclabs/hardhat-solhint": "^2.0.0",
